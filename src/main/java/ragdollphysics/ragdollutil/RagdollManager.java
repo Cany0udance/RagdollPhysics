@@ -198,6 +198,9 @@ public class RagdollManager {
 
         // Clean up failed tracking (allow future attempts if monster is somehow revived)
         failedRagdolls.remove(monster);
+
+        // NEW: Clean up overkill tracking
+        OverkillTracker.cleanup(monster);
     }
 
     /**

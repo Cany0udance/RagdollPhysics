@@ -30,6 +30,7 @@ public class MultiBodyRagdoll {
     private final HashMap<String, AttachmentPhysics> attachmentBodies;
     public final RagdollPhysics mainBody;
     private final float groundY;
+    private final AbstractMonster associatedMonster;
 
     // Fields for shadow fading
     private final Slot shadowSlot;
@@ -68,6 +69,7 @@ public class MultiBodyRagdoll {
                             String monsterClassName, AbstractMonster monster) {
         this.boneWobbles = new HashMap<>();
         this.monsterClassName = monsterClassName;
+        this.associatedMonster = monster;
         this.attachmentBodies = new HashMap<>();
         this.groundY = groundLevel;
         this.mainBody = new RagdollPhysics(startX, startY, 0, 0, groundLevel);
@@ -160,6 +162,7 @@ public class MultiBodyRagdoll {
                             String monsterClassName, AbstractMonster monster) {
         this.boneWobbles = new HashMap<>(); // Empty for image ragdolls
         this.monsterClassName = monsterClassName;
+        this.associatedMonster = monster;
         this.attachmentBodies = new HashMap<>(); // Empty for image ragdolls
         this.groundY = groundLevel;
         this.mainBody = new RagdollPhysics(startX, startY, 0, 0, groundLevel);
@@ -442,49 +445,54 @@ public class MultiBodyRagdoll {
             lastLogTime = System.currentTimeMillis();
         }
 
-        mainBody.velocityX += forceX * 0.8f;
-        mainBody.velocityY += forceY * 0.8f;
+        // GET PHYSICS MODIFIERS - This is the key addition
+        PhysicsModifier.VelocityModifiers modifiers = PhysicsModifier.calculateModifiers(associatedMonster);
+
+        // Apply modified forces to main body
+        mainBody.velocityX += forceX * 0.8f * modifiers.horizontalMultiplier;
+        mainBody.velocityY += forceY * 0.8f * modifiers.verticalMultiplier;
         lastRotation = mainBody.rotation;
 
-        // Reduced angular velocity
+        // Calculate angular velocity with modifiers
         float upwardVelocity = Math.max(0, mainBody.velocityY);
         float flipIntensity = Math.min(upwardVelocity / 1200f, 0.5f);
         float baseAngularVel = MathUtils.random(-72f, 72f);
-        mainBody.angularVelocity += baseAngularVel * (1.0f + flipIntensity * 0.3f);
+        mainBody.angularVelocity += baseAngularVel * (1.0f + flipIntensity * 0.3f) * modifiers.angularMultiplier;
 
         if (canLog()) {
-            BaseMod.logger.info("[" + ragdollId + "] After initial force - vel: ("
+            BaseMod.logger.info("[" + ragdollId + "] After modified force - vel: ("
                     + String.format("%.1f", mainBody.velocityX) + ", "
                     + String.format("%.1f", mainBody.velocityY)
                     + "), angVel: " + String.format("%.1f", mainBody.angularVelocity)
-                    + ", flipIntensity: " + String.format("%.2f", flipIntensity));
+                    + ", modifiers: " + modifiers);
             lastLogTime = System.currentTimeMillis();
         }
 
+        // Apply modifiers to attachments
         int attachmentsAffected = 0;
         for (AttachmentPhysics attachment : attachmentBodies.values()) {
-            // INCREASED: Base force multiplier range
-            attachment.velocityX += forceX * MathUtils.random(0.5f, 1.2f); // Original: (0.8f, 1.0f)
-            attachment.velocityY += forceY * MathUtils.random(0.4f, 1.0f); // Original: (0.6f, 0.8f)
+            // Apply horizontal force with modifiers
+            attachment.velocityX += forceX * MathUtils.random(0.5f, 1.2f) * modifiers.horizontalMultiplier;
+            attachment.velocityY += forceY * MathUtils.random(0.4f, 1.0f) * modifiers.verticalMultiplier;
 
-            // INCREASED: Angular velocity range
-            float attachmentBaseAngular = MathUtils.random(-360f, 360f); // Original: (-180f, 180f)
-            attachment.angularVelocity += attachmentBaseAngular * (1.0f + flipIntensity * 0.5f);
+            // Apply angular velocity with modifiers
+            float attachmentBaseAngular = MathUtils.random(-360f, 360f);
+            attachment.angularVelocity += attachmentBaseAngular * (1.0f + flipIntensity * 0.5f) * modifiers.angularMultiplier;
 
-            // INCREASED: Random variation
-            attachment.velocityX += MathUtils.random(-75f, 75f); // Original: (-25f, 25f)
-            attachment.velocityY += MathUtils.random(-50f, 100f); // Original: (-15f, 35f)
+            // Random variation (also affected by horizontal modifier for X component)
+            attachment.velocityX += MathUtils.random(-75f, 75f) * modifiers.horizontalMultiplier;
+            attachment.velocityY += MathUtils.random(-50f, 100f) * modifiers.verticalMultiplier;
 
             attachmentsAffected++;
         }
 
-        // Bone wobble application
+        // Apply modifiers to bone wobbles
         for (BoneWobble wobble : boneWobbles.values()) {
-            wobble.angularVelocity += MathUtils.random(-90f, 90f) * (1.0f + flipIntensity * 0.5f);
+            wobble.angularVelocity += MathUtils.random(-90f, 90f) * (1.0f + flipIntensity * 0.5f) * modifiers.angularMultiplier;
         }
 
         if (canLog()) {
-            BaseMod.logger.info("[" + ragdollId + "] Global force complete - affected " + attachmentsAffected
+            BaseMod.logger.info("[" + ragdollId + "] Modified global force complete - affected " + attachmentsAffected
                     + " attachments and " + boneWobbles.size() + " bone wobbles");
             lastLogTime = System.currentTimeMillis();
         }
