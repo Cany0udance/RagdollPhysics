@@ -83,6 +83,11 @@ public class MultiBodyRagdoll {
         Slot shadowSlot = skeleton.findSlot("shadow");
         Bone shadowBone = skeleton.findBone("shadow");
 
+        BaseMod.logger.info("[" + ragdollId + "] POSITION DEBUG - monster.drawX: " + monster.drawX
+                + ", monster.drawY: " + monster.drawY + ", startX: " + startX + ", startY: " + startY);
+        BaseMod.logger.info("[" + ragdollId + "] POSITION DEBUG - initialOffsetX: " + initialOffsetX
+                + ", initialOffsetY: " + initialOffsetY);
+
         if (shadowSlot == null && shadowBone != null) {
             for (Slot slot : skeleton.getSlots()) {
                 if (slot.getBone() == shadowBone) {
@@ -533,8 +538,18 @@ public class MultiBodyRagdoll {
         float centerY = (minY + maxY) / 2f;
 
         skeleton.setPosition(
+                mainBody.x + initialOffsetX,  // Fixed relationship
+                mainBody.y + initialOffsetY   // No drift
+        );
+
+        /* Older version of setPosition, might be relevant later
+
+        skeleton.setPosition(
                 mainBody.x + initialOffsetX - centerX * Settings.scale,
-                mainBody.y + initialOffsetY - centerY * Settings.scale);
+                mainBody.y + initialOffsetY - centerY * Settings.scale
+        );
+
+         */
 
         if (skeleton.getRootBone() != null) {
             // Apply rotation around the visual center, not the root
