@@ -42,6 +42,9 @@ public class MultiBodyRagdoll {
     private final float initialShadowAlpha;
     private float shadowFadeTimer = 0f;
     private static final float SHADOW_FADE_DURATION = 0.5f;
+    // Add these fields to MultiBodyRagdoll class to track the relationship
+    private final float physicsToVisualOffsetX;
+    private final float physicsToVisualOffsetY;
 
     private final float initialOffsetX;
     private final float initialOffsetY;
@@ -77,7 +80,22 @@ public class MultiBodyRagdoll {
         this.associatedMonster = monster;
         this.attachmentBodies = new HashMap<>();
         this.groundY = groundLevel;
-        this.mainBody = new RagdollPhysics(startX, startY, 0, 0, groundLevel);
+
+        // GET CENTER OF MASS CORRECTION
+        CenterOfMassConfig.CenterOffset centerOffset = CenterOfMassConfig.getCenterOffset(monsterClassName);
+
+        // Apply the correction to the main body physics center
+        float correctedStartX = startX + centerOffset.x;
+        float correctedStartY = startY + centerOffset.y;
+
+        this.mainBody = new RagdollPhysics(correctedStartX, correctedStartY, 0, 0, groundLevel);
+
+        // CRITICAL: Calculate the FIXED relationship between physics center and visual center
+        // This relationship should NEVER change during the simulation
+        this.physicsToVisualOffsetX = (monster.drawX - correctedStartX);
+        this.physicsToVisualOffsetY = (monster.drawY - correctedStartY);
+
+        // Store original offsets for reference (but we won't use these for positioning)
         this.initialOffsetX = monster.drawX - startX;
         this.initialOffsetY = monster.drawY - startY;
 
@@ -85,13 +103,16 @@ public class MultiBodyRagdoll {
         this.ragdollId = "Ragdoll_" + System.currentTimeMillis() % 10000;
         this.isImageBased = false;
 
+        // Log the FIXED relationship
+        BaseMod.logger.info("[" + ragdollId + "] FIXED PHYSICS-VISUAL RELATIONSHIP established:");
+        BaseMod.logger.info("[" + ragdollId + "] Physics center: (" + correctedStartX + ", " + correctedStartY + ")");
+        BaseMod.logger.info("[" + ragdollId + "] Visual center: (" + monster.drawX + ", " + monster.drawY + ")");
+        BaseMod.logger.info("[" + ragdollId + "] Fixed offset: (" + physicsToVisualOffsetX + ", " + physicsToVisualOffsetY + ")");
+        BaseMod.logger.info("[" + ragdollId + "] Center correction applied: " + centerOffset);
+
+        // ... rest of constructor remains the same for shadow and attachments
         Slot shadowSlot = skeleton.findSlot("shadow");
         Bone shadowBone = skeleton.findBone("shadow");
-
-        BaseMod.logger.info("[" + ragdollId + "] POSITION DEBUG - monster.drawX: " + monster.drawX
-                + ", monster.drawY: " + monster.drawY + ", startX: " + startX + ", startY: " + startY);
-        BaseMod.logger.info("[" + ragdollId + "] POSITION DEBUG - initialOffsetX: " + initialOffsetX
-                + ", initialOffsetY: " + initialOffsetY);
 
         if (shadowSlot == null && shadowBone != null) {
             for (Slot slot : skeleton.getSlots()) {
@@ -122,28 +143,22 @@ public class MultiBodyRagdoll {
         }
 
         BaseMod.logger.info("[" + ragdollId + "] Creating ragdoll for "
-                + monsterClassName + " at (" + startX + ", " + startY
+                + monsterClassName + " at corrected (" + correctedStartX + ", " + correctedStartY
                 + "), ground: " + groundLevel);
         BaseMod.logger.info("[" + ragdollId + "] Skeleton has "
                 + skeleton.getBones().size + " bones");
 
         int attachmentCount = 0;
 
-        // Handle any attachment type
+        // Handle attachments - use ORIGINAL startX/Y for bone positioning
         for (Slot slot : skeleton.getSlots()) {
             if (slot.getAttachment() != null) {
                 String attachmentName = slot.getAttachment().getName();
                 Bone bone = slot.getBone();
 
-                BaseMod.logger.info("DEBUG: Found attachment '" + attachmentName
-                        + "' on bone '" + bone.getData().getName() + "'");
-
-                // Check if this attachment should be detached for this monster
                 boolean shouldDetach = AttachmentConfig.shouldDetachAttachment(monsterClassName, attachmentName);
-                BaseMod.logger.info("DEBUG: Attachment '" + attachmentName + "' should detach: " + shouldDetach);
 
-                if (AttachmentConfig.shouldDetachAttachment(monsterClassName, attachmentName)) {
-                    // Create AttachmentPhysics for ANY attachment type
+                if (shouldDetach) {
                     attachmentBodies.put(attachmentName,
                             new AttachmentPhysics(
                                     startX + bone.getWorldX() * Settings.scale,
@@ -167,6 +182,7 @@ public class MultiBodyRagdoll {
         }
     }
 
+
     // Constructor for image-based ragdolls (like Hexaghost)
     public MultiBodyRagdoll(float startX, float startY, float groundLevel,
                             String monsterClassName, AbstractMonster monster) {
@@ -175,12 +191,25 @@ public class MultiBodyRagdoll {
         this.associatedMonster = monster;
         this.attachmentBodies = new HashMap<>(); // Empty for image ragdolls
         this.groundY = groundLevel;
-        this.mainBody = new RagdollPhysics(startX, startY, 0, 0, groundLevel);
+
+        // GET CENTER OF MASS CORRECTION for image-based ragdolls too
+        CenterOfMassConfig.CenterOffset centerOffset = CenterOfMassConfig.getCenterOffset(monsterClassName);
+
+        // Apply the correction to the main body physics center
+        float correctedStartX = startX + centerOffset.x;
+        float correctedStartY = startY + centerOffset.y;
+
+        this.mainBody = new RagdollPhysics(correctedStartX, correctedStartY, 0, 0, groundLevel);
+
+        // CRITICAL: Calculate the FIXED relationship between physics center and visual center
+        this.physicsToVisualOffsetX = (monster.drawX - correctedStartX);
+        this.physicsToVisualOffsetY = (monster.drawY - correctedStartY);
+
         this.creationTime = System.currentTimeMillis();
         this.ragdollId = "ImageRagdoll_" + System.currentTimeMillis() % 10000;
         this.isImageBased = true;
 
-        // Store the offset between monster draw position and physics body start position
+        // Store the offset between monster draw position and original physics body start position (for reference)
         this.initialOffsetX = monster.drawX - startX;
         this.initialOffsetY = monster.drawY - startY;
 
@@ -188,9 +217,12 @@ public class MultiBodyRagdoll {
         this.shadowSlot = null;
         this.initialShadowAlpha = 0f;
 
-        BaseMod.logger.info("[" + ragdollId + "] Created image ragdoll for "
-                + monsterClassName + " at (" + startX + ", " + startY
-                + "), ground: " + groundLevel);
+        // Log the FIXED relationship for image ragdolls too
+        BaseMod.logger.info("[" + ragdollId + "] FIXED PHYSICS-VISUAL RELATIONSHIP established (IMAGE-BASED):");
+        BaseMod.logger.info("[" + ragdollId + "] Physics center: (" + correctedStartX + ", " + correctedStartY + ")");
+        BaseMod.logger.info("[" + ragdollId + "] Visual center: (" + monster.drawX + ", " + monster.drawY + ")");
+        BaseMod.logger.info("[" + ragdollId + "] Fixed offset: (" + physicsToVisualOffsetX + ", " + physicsToVisualOffsetY + ")");
+        BaseMod.logger.info("[" + ragdollId + "] Center correction applied: " + centerOffset);
     }
 
     public boolean isProperlyInitialized() {
@@ -353,6 +385,26 @@ public class MultiBodyRagdoll {
         }
     }
 
+    // Add a method to handle image-based positioning with fixed relationship
+    public void applyToImage(AbstractMonster monster) {
+        // For image-based ragdolls, we need to update the monster's drawX/drawY
+        // to maintain the fixed relationship with the physics center
+        monster.drawX = mainBody.x + physicsToVisualOffsetX;
+        monster.drawY = mainBody.y + physicsToVisualOffsetY;
+
+        // Apply rotation if the monster supports it
+        // (You might need to store rotation in a field that the image renderer uses)
+
+        if (updateCount % 180 == 0 && canLog()) {
+            BaseMod.logger.info("[" + ragdollId + "] IMAGE SYNC CHECK - Physics: ("
+                    + String.format("%.1f", mainBody.x) + ", " + String.format("%.1f", mainBody.y)
+                    + ") -> Visual: (" + String.format("%.1f", monster.drawX) + ", " + String.format("%.1f", monster.drawY)
+                    + "), offset: (" + String.format("%.1f", physicsToVisualOffsetX) + ", "
+                    + String.format("%.1f", physicsToVisualOffsetY) + ")");
+            lastLogTime = System.currentTimeMillis();
+        }
+    }
+
     private void applyRotationLimiting(float deltaTime) {
         float rotationDelta = mainBody.rotation - lastRotation;
         if (rotationDelta > 180f)
@@ -508,7 +560,7 @@ public class MultiBodyRagdoll {
         }
     }
 
-    // UPDATED applyToBones METHOD - Hide attachments that have physics bodies
+    // Update the applyToBones method to handle the corrected physics center
     public void applyToBones(Skeleton skeleton, AbstractMonster monster) {
         // Calculate visual center of the skeleton instead of using root position
         float minX = Float.MAX_VALUE, maxX = Float.MIN_VALUE;
@@ -542,19 +594,16 @@ public class MultiBodyRagdoll {
         float centerX = (minX + maxX) / 2f;
         float centerY = (minY + maxY) / 2f;
 
+        // IMPORTANT: Get the center offset that was applied to the physics body
+        CenterOfMassConfig.CenterOffset centerOffset = CenterOfMassConfig.getCenterOffset(monsterClassName);
+
+        // Position skeleton relative to the corrected physics center
+        // We need to subtract the offset because the physics center was moved UP,
+        // so the visual needs to be moved DOWN relative to the physics center
         skeleton.setPosition(
-                mainBody.x + initialOffsetX,  // Fixed relationship
-                mainBody.y + initialOffsetY   // No drift
+                mainBody.x + initialOffsetX - centerOffset.x,
+                mainBody.y + initialOffsetY - centerOffset.y
         );
-
-        /* Older version of setPosition, might be relevant later
-
-        skeleton.setPosition(
-                mainBody.x + initialOffsetX - centerX * Settings.scale,
-                mainBody.y + initialOffsetY - centerY * Settings.scale
-        );
-
-         */
 
         if (skeleton.getRootBone() != null) {
             // Apply rotation around the visual center, not the root
@@ -569,11 +618,12 @@ public class MultiBodyRagdoll {
                 BaseMod.logger.info("[" + ragdollId + "] Applied rotation: "
                         + String.format("%.1f", normalizedRotation) + "°, center: ("
                         + String.format("%.1f", centerX) + ", "
-                        + String.format("%.1f", centerY) + ")");
+                        + String.format("%.1f", centerY) + "), offset correction: " + centerOffset);
                 lastLogTime = System.currentTimeMillis();
             }
         }
 
+        // Rest of the method remains the same...
         // Apply fade out to shadow
         if (shadowSlot != null) {
             float fadeProgress = Math.min(1f, shadowFadeTimer / SHADOW_FADE_DURATION);
@@ -612,7 +662,7 @@ public class MultiBodyRagdoll {
             BaseMod.logger.info("[" + ragdollId + "] Bones applied - hidden attachments: " + hiddenAttachments
                     + ", wobbled bones: " + wobbledBones + ", skeleton pos: ("
                     + String.format("%.1f", mainBody.x) + ", "
-                    + String.format("%.1f", mainBody.y) + ")");
+                    + String.format("%.1f", mainBody.y) + "), with offset correction: " + centerOffset);
             lastLogTime = System.currentTimeMillis();
         }
 
@@ -805,17 +855,28 @@ public class MultiBodyRagdoll {
         }
     }
 
-    // Add this method to MultiBodyRagdoll class
+    // Replace the renderDebugSquares method with this more robust version
     public void renderDebugSquares(SpriteBatch sb) {
         if (!debugRenderingEnabled) return;
 
         loadDebugTexture();
         if (debugSquareTexture == null) return;
 
+        /*
+         * DEBUG SQUARE COLOR LEGEND:
+         * RED:        Physics center (where physics simulation happens)
+         * MAGENTA:    Expected visual center (where we're trying to position the skeleton)
+         * ORANGE:     Monster's drawX/drawY position
+         * LIME:       Actual skeleton position (skeleton.getX/Y)
+         * CYAN:       "body" bone world position (the actual visual body center)
+         * YELLOW:     Detached attachment physics bodies
+         * WHITE:      Ground level indicator line
+         */
+
         // Store original color
         Color originalColor = sb.getColor();
 
-        // Debug square size (you can adjust this)
+        // Debug square size
         float squareSize = 20f * Settings.scale;
 
         // 1. Main body physics center (RED)
@@ -825,7 +886,154 @@ public class MultiBodyRagdoll {
                 mainBody.y - squareSize/2f,
                 squareSize, squareSize);
 
-        // 2. Attachment physics bodies (YELLOW)
+        // 2. Visual center based on fixed relationship (MAGENTA)
+        float visualCenterX = mainBody.x + physicsToVisualOffsetX;
+        float visualCenterY = mainBody.y + physicsToVisualOffsetY;
+        sb.setColor(Color.MAGENTA);
+        sb.draw(debugSquareTexture,
+                visualCenterX - squareSize/2f,
+                visualCenterY - squareSize/2f,
+                squareSize, squareSize);
+
+        // 3. MONSTER drawX/drawY (ORANGE) - Always show this as baseline
+        sb.setColor(Color.ORANGE);
+        sb.draw(debugSquareTexture,
+                associatedMonster.drawX - squareSize/2f,
+                associatedMonster.drawY - squareSize/2f,
+                squareSize, squareSize);
+
+        // 4. Try to find and show skeleton position (LIME GREEN)
+        if (!isImageBased && associatedMonster != null) {
+            // COMPREHENSIVE field search with detailed logging
+            Class<?> monsterClass = associatedMonster.getClass();
+            String monsterClassName = monsterClass.getSimpleName();
+
+            // Log every few seconds for debugging
+            if (updateCount % 180 == 0) {
+                BaseMod.logger.info("[" + ragdollId + "] === SKELETON SEARCH DEBUG ===");
+                BaseMod.logger.info("[" + ragdollId + "] Monster class: " + monsterClassName);
+                BaseMod.logger.info("[" + ragdollId + "] Searching for skeleton field...");
+
+                // List ALL fields in the monster class
+                java.lang.reflect.Field[] allFields = monsterClass.getDeclaredFields();
+                BaseMod.logger.info("[" + ragdollId + "] Monster has " + allFields.length + " fields:");
+                for (java.lang.reflect.Field field : allFields) {
+                    BaseMod.logger.info("[" + ragdollId + "] - Field: " + field.getName() + " (type: " + field.getType().getSimpleName() + ")");
+                }
+
+                // Also check parent classes
+                Class<?> parentClass = monsterClass.getSuperclass();
+                while (parentClass != null && !parentClass.equals(Object.class)) {
+                    java.lang.reflect.Field[] parentFields = parentClass.getDeclaredFields();
+                    BaseMod.logger.info("[" + ragdollId + "] Parent class " + parentClass.getSimpleName() + " has " + parentFields.length + " fields:");
+                    for (java.lang.reflect.Field field : parentFields) {
+                        BaseMod.logger.info("[" + ragdollId + "] - Parent Field: " + field.getName() + " (type: " + field.getType().getSimpleName() + ")");
+                    }
+                    parentClass = parentClass.getSuperclass();
+                }
+            }
+
+            // Try to find skeleton field
+            Skeleton foundSkeleton = null;
+            String foundFieldName = null;
+
+            // Search current class and all parent classes
+            Class<?> searchClass = monsterClass;
+            while (searchClass != null && foundSkeleton == null) {
+                java.lang.reflect.Field[] fields = searchClass.getDeclaredFields();
+
+                for (java.lang.reflect.Field field : fields) {
+                    try {
+                        field.setAccessible(true);
+                        Object fieldValue = field.get(associatedMonster);
+
+                        if (fieldValue instanceof Skeleton) {
+                            foundSkeleton = (Skeleton) fieldValue;
+                            foundFieldName = field.getName();
+                            if (updateCount % 180 == 0) {
+                                BaseMod.logger.info("[" + ragdollId + "] FOUND SKELETON in field: " + foundFieldName + " (class: " + searchClass.getSimpleName() + ")");
+                            }
+                            break;
+                        }
+                    } catch (Exception e) {
+                        // Ignore and continue
+                    }
+                }
+
+                searchClass = searchClass.getSuperclass();
+            }
+
+            if (foundSkeleton != null) {
+                // Show skeleton position as LIME GREEN square
+                sb.setColor(Color.LIME);
+                float skeletonX = foundSkeleton.getX();
+                float skeletonY = foundSkeleton.getY();
+                sb.draw(debugSquareTexture,
+                        skeletonX - squareSize/2f,
+                        skeletonY - squareSize/2f,
+                        squareSize, squareSize);
+
+                // NEW: Find and show the "body" bone position (CYAN)
+                Bone bodyBone = foundSkeleton.findBone("body");
+                if (bodyBone != null) {
+                    sb.setColor(Color.CYAN);
+                    float bodyX = foundSkeleton.getX() + bodyBone.getWorldX() * Settings.scale;
+                    float bodyY = foundSkeleton.getY() + bodyBone.getWorldY() * Settings.scale;
+                    sb.draw(debugSquareTexture,
+                            bodyX - squareSize/2f,
+                            bodyY - squareSize/2f,
+                            squareSize, squareSize);
+
+                    if (updateCount % 60 == 0) {
+                        BaseMod.logger.info("[" + ragdollId + "] BODY BONE FOUND at world pos: (" + String.format("%.1f", bodyX) + ", " + String.format("%.1f", bodyY) + ")");
+                    }
+                } else {
+                    // Try alternative bone names if "body" doesn't exist
+                    String[] alternativeNames = {"torso", "chest", "spine", "hip", "pelvis", "trunk"};
+                    boolean foundAlternative = false;
+
+                    for (String boneName : alternativeNames) {
+                        Bone bone = foundSkeleton.findBone(boneName);
+                        if (bone != null) {
+                            sb.setColor(Color.CYAN);
+                            float boneX = foundSkeleton.getX() + bone.getWorldX() * Settings.scale;
+                            float boneY = foundSkeleton.getY() + bone.getWorldY() * Settings.scale;
+                            sb.draw(debugSquareTexture,
+                                    boneX - squareSize/2f,
+                                    boneY - squareSize/2f,
+                                    squareSize, squareSize);
+
+                            if (updateCount % 60 == 0) {
+                                BaseMod.logger.info("[" + ragdollId + "] BODY-LIKE BONE '" + boneName + "' found at world pos: (" + String.format("%.1f", boneX) + ", " + String.format("%.1f", boneY) + ")");
+                            }
+                            foundAlternative = true;
+                            break;
+                        }
+                    }
+
+                    if (!foundAlternative && updateCount % 180 == 0) {
+                        BaseMod.logger.warn("[" + ragdollId + "] NO BODY BONE FOUND - available bones:");
+                        for (int i = 0; i < foundSkeleton.getBones().size; i++) {
+                            Bone bone = foundSkeleton.getBones().get(i);
+                            BaseMod.logger.info("[" + ragdollId + "] - Bone: " + bone.getData().getName());
+                        }
+                    }
+                }
+
+                if (updateCount % 60 == 0) {
+                    BaseMod.logger.info("[" + ragdollId + "] POSITION COMPARISON:");
+                    BaseMod.logger.info("[" + ragdollId + "] - Physics center (RED): (" + String.format("%.1f", mainBody.x) + ", " + String.format("%.1f", mainBody.y) + ")");
+                    BaseMod.logger.info("[" + ragdollId + "] - Expected visual (MAGENTA): (" + String.format("%.1f", visualCenterX) + ", " + String.format("%.1f", visualCenterY) + ")");
+                    BaseMod.logger.info("[" + ragdollId + "] - Monster drawX/Y (ORANGE): (" + String.format("%.1f", associatedMonster.drawX) + ", " + String.format("%.1f", associatedMonster.drawY) + ")");
+                    BaseMod.logger.info("[" + ragdollId + "] - Skeleton pos (LIME): (" + String.format("%.1f", skeletonX) + ", " + String.format("%.1f", skeletonY) + ")");
+                    BaseMod.logger.info("[" + ragdollId + "] - Fixed offset: (" + String.format("%.1f", physicsToVisualOffsetX) + ", " + String.format("%.1f", physicsToVisualOffsetY) + ")");
+                }
+            } else if (updateCount % 180 == 0) {
+                BaseMod.logger.warn("[" + ragdollId + "] NO SKELETON FIELD FOUND in " + monsterClassName + " or its parent classes!");
+            }
+        }
+
+        // 5. Attachment physics bodies (YELLOW)
         sb.setColor(Color.YELLOW);
         for (AttachmentPhysics attachment : attachmentBodies.values()) {
             sb.draw(debugSquareTexture,
@@ -834,49 +1042,7 @@ public class MultiBodyRagdoll {
                     squareSize, squareSize);
         }
 
-        // 3. Important bone positions (skeleton-based ragdolls only)
-        if (!isImageBased && associatedMonster != null) {
-            // Get skeleton to find bone world positions
-            try {
-                java.lang.reflect.Field skeletonField = associatedMonster.getClass().getDeclaredField("skeleton");
-                skeletonField.setAccessible(true);
-                Skeleton skeleton = (Skeleton) skeletonField.get(associatedMonster);
-
-                if (skeleton != null) {
-                    // Root bone (GREEN)
-                    Bone rootBone = skeleton.getRootBone();
-                    if (rootBone != null) {
-                        sb.setColor(Color.GREEN);
-                        float rootX = skeleton.getX() + rootBone.getWorldX() * Settings.scale;
-                        float rootY = skeleton.getY() + rootBone.getWorldY() * Settings.scale;
-                        sb.draw(debugSquareTexture,
-                                rootX - squareSize/2f,
-                                rootY - squareSize/2f,
-                                squareSize, squareSize);
-                    }
-
-                    // Important named bones (BLUE)
-                    sb.setColor(Color.CYAN);
-                    String[] importantBoneNames = {"torso", "body", "chest", "hip", "pelvis", "spine"};
-
-                    for (String boneName : importantBoneNames) {
-                        Bone bone = skeleton.findBone(boneName);
-                        if (bone != null) {
-                            float boneX = skeleton.getX() + bone.getWorldX() * Settings.scale;
-                            float boneY = skeleton.getY() + bone.getWorldY() * Settings.scale;
-                            sb.draw(debugSquareTexture,
-                                    boneX - squareSize/2f,
-                                    boneY - squareSize/2f,
-                                    squareSize, squareSize);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                // Reflection failed, skip bone debug rendering
-            }
-        }
-
-        // 4. Ground level indicator (WHITE line of squares)
+        // 6. Ground level indicator (WHITE line of squares)
         sb.setColor(Color.WHITE);
         float groundSquareSize = 10f * Settings.scale;
         float startX = mainBody.x - 200f;
