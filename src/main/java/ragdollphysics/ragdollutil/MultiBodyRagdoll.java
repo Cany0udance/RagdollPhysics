@@ -4,7 +4,9 @@ import basemod.BaseMod;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.PolygonSpriteBatch;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.math.MathUtils;
 import com.esotericsoftware.spine.Bone;
@@ -13,6 +15,7 @@ import com.esotericsoftware.spine.Slot;
 import com.esotericsoftware.spine.attachments.MeshAttachment;
 import com.esotericsoftware.spine.attachments.RegionAttachment;
 import com.megacrit.cardcrawl.core.Settings;
+import com.megacrit.cardcrawl.helpers.ImageMaster;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
 import com.megacrit.cardcrawl.monsters.exordium.Sentry;
 import ragdollphysics.ragdollutil.AttachmentPhysics;
@@ -31,6 +34,8 @@ public class MultiBodyRagdoll {
     public final RagdollPhysics mainBody;
     private final float groundY;
     private final AbstractMonster associatedMonster;
+    private static Texture debugSquareTexture = null;
+    private static boolean debugRenderingEnabled = true; // Set to false to disable
 
     // Fields for shadow fading
     private final Slot shadowSlot;
@@ -785,5 +790,105 @@ public class MultiBodyRagdoll {
 
     public float getAverageRotation() {
         return mainBody.rotation;
+    }
+
+    // Add this method to MultiBodyRagdoll class
+    private static void loadDebugTexture() {
+        if (debugSquareTexture == null) {
+            try {
+                debugSquareTexture = ImageMaster.loadImage("ragdollphysics/images/DebugSquare.png");
+                BaseMod.logger.info("Debug square texture loaded successfully");
+            } catch (Exception e) {
+                BaseMod.logger.warn("Could not load debug square texture: " + e.getMessage());
+                debugRenderingEnabled = false;
+            }
+        }
+    }
+
+    // Add this method to MultiBodyRagdoll class
+    public void renderDebugSquares(SpriteBatch sb) {
+        if (!debugRenderingEnabled) return;
+
+        loadDebugTexture();
+        if (debugSquareTexture == null) return;
+
+        // Store original color
+        Color originalColor = sb.getColor();
+
+        // Debug square size (you can adjust this)
+        float squareSize = 20f * Settings.scale;
+
+        // 1. Main body physics center (RED)
+        sb.setColor(Color.RED);
+        sb.draw(debugSquareTexture,
+                mainBody.x - squareSize/2f,
+                mainBody.y - squareSize/2f,
+                squareSize, squareSize);
+
+        // 2. Attachment physics bodies (YELLOW)
+        sb.setColor(Color.YELLOW);
+        for (AttachmentPhysics attachment : attachmentBodies.values()) {
+            sb.draw(debugSquareTexture,
+                    attachment.x - squareSize/2f,
+                    attachment.y - squareSize/2f,
+                    squareSize, squareSize);
+        }
+
+        // 3. Important bone positions (skeleton-based ragdolls only)
+        if (!isImageBased && associatedMonster != null) {
+            // Get skeleton to find bone world positions
+            try {
+                java.lang.reflect.Field skeletonField = associatedMonster.getClass().getDeclaredField("skeleton");
+                skeletonField.setAccessible(true);
+                Skeleton skeleton = (Skeleton) skeletonField.get(associatedMonster);
+
+                if (skeleton != null) {
+                    // Root bone (GREEN)
+                    Bone rootBone = skeleton.getRootBone();
+                    if (rootBone != null) {
+                        sb.setColor(Color.GREEN);
+                        float rootX = skeleton.getX() + rootBone.getWorldX() * Settings.scale;
+                        float rootY = skeleton.getY() + rootBone.getWorldY() * Settings.scale;
+                        sb.draw(debugSquareTexture,
+                                rootX - squareSize/2f,
+                                rootY - squareSize/2f,
+                                squareSize, squareSize);
+                    }
+
+                    // Important named bones (BLUE)
+                    sb.setColor(Color.CYAN);
+                    String[] importantBoneNames = {"torso", "body", "chest", "hip", "pelvis", "spine"};
+
+                    for (String boneName : importantBoneNames) {
+                        Bone bone = skeleton.findBone(boneName);
+                        if (bone != null) {
+                            float boneX = skeleton.getX() + bone.getWorldX() * Settings.scale;
+                            float boneY = skeleton.getY() + bone.getWorldY() * Settings.scale;
+                            sb.draw(debugSquareTexture,
+                                    boneX - squareSize/2f,
+                                    boneY - squareSize/2f,
+                                    squareSize, squareSize);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Reflection failed, skip bone debug rendering
+            }
+        }
+
+        // 4. Ground level indicator (WHITE line of squares)
+        sb.setColor(Color.WHITE);
+        float groundSquareSize = 10f * Settings.scale;
+        float startX = mainBody.x - 200f;
+        float endX = mainBody.x + 200f;
+        for (float x = startX; x <= endX; x += groundSquareSize * 2) {
+            sb.draw(debugSquareTexture,
+                    x - groundSquareSize/2f,
+                    groundY - groundSquareSize/2f,
+                    groundSquareSize, groundSquareSize);
+        }
+
+        // Restore original color
+        sb.setColor(originalColor);
     }
 }

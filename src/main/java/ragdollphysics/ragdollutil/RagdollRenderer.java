@@ -64,50 +64,7 @@ public class RagdollRenderer {
         }
     }
 
-    /**
-     * Render image-based monsters (like Hexaghost)
-     */
-    private void renderImageBased(AbstractMonster monster, SpriteBatch sb, MultiBodyRagdoll ragdoll,
-                                  ReflectionHelper reflectionHelper) throws Exception {
-
-        Texture img = reflectionHelper.getImage(monster);
-        if (img == null) {
-            return;
-        }
-
-        // Set monster's tint color
-        sb.setColor(monster.tint.color);
-
-        // Get ragdoll position and rotation
-        float centerX = ragdoll.getCenterX();
-        float centerY = ragdoll.getCenterY();
-        float rotation = ragdoll.getAverageRotation();
-
-        // Calculate image center for proper rotation
-        float imgCenterX = img.getWidth() * Settings.scale / 2.0f;
-        float imgCenterY = img.getHeight() * Settings.scale / 2.0f;
-
-        // Render the image with physics-based position and rotation
-        sb.draw(img,
-                centerX - imgCenterX,
-                centerY - imgCenterY,
-                imgCenterX,  // origin X
-                imgCenterY,  // origin Y
-                img.getWidth() * Settings.scale,   // width
-                img.getHeight() * Settings.scale,  // height
-                1f,          // scale X
-                1f,          // scale Y
-                rotation,    // rotation
-                0, 0,        // source X, Y
-                img.getWidth(),
-                img.getHeight(),
-                monster.flipHorizontal,
-                monster.flipVertical);
-    }
-
-    /**
-     * Render skeleton-based monsters with physics applied to bones
-     */
+    // Update the render method in RagdollRenderer class
     private void renderSkeletonBased(AbstractMonster monster, SpriteBatch sb, MultiBodyRagdoll ragdoll,
                                      ReflectionHelper reflectionHelper, TextureAtlas atlas) throws Exception {
 
@@ -144,5 +101,50 @@ public class RagdollRenderer {
 
         // Reset blend function to standard alpha blending
         sb.setBlendFunction(770, 771);
+
+        // NEW: Render debug squares
+        ragdoll.renderDebugSquares(sb);
+    }
+
+    // Update the render method in RagdollRenderer class for image-based too
+    private void renderImageBased(AbstractMonster monster, SpriteBatch sb, MultiBodyRagdoll ragdoll,
+                                  ReflectionHelper reflectionHelper) throws Exception {
+
+        Texture img = reflectionHelper.getImage(monster);
+        if (img == null) {
+            return;
+        }
+
+        // Set monster's tint color
+        sb.setColor(monster.tint.color);
+
+        // Get ragdoll position and rotation
+        float centerX = ragdoll.getCenterX();
+        float centerY = ragdoll.getCenterY();
+        float rotation = ragdoll.getAverageRotation();
+
+        // Calculate image center for proper rotation
+        float imgCenterX = img.getWidth() * Settings.scale / 2.0f;
+        float imgCenterY = img.getHeight() * Settings.scale / 2.0f;
+
+        // Render the image with physics-based position and rotation
+        sb.draw(img,
+                centerX - imgCenterX,
+                centerY - imgCenterY,
+                imgCenterX,  // origin X
+                imgCenterY,  // origin Y
+                img.getWidth() * Settings.scale,   // width
+                img.getHeight() * Settings.scale,  // height
+                1f,          // scale X
+                1f,          // scale Y
+                rotation,    // rotation
+                0, 0,        // source X, Y
+                img.getWidth(),
+                img.getHeight(),
+                monster.flipHorizontal,
+                monster.flipVertical);
+
+        // NEW: Render debug squares for image-based ragdolls too
+        ragdoll.renderDebugSquares(sb);
     }
 }
