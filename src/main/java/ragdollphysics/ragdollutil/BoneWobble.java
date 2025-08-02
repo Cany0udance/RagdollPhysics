@@ -3,6 +3,8 @@ import basemod.BaseMod;
 import com.esotericsoftware.spine.Bone;
 import com.esotericsoftware.spine.Slot;
 
+import static ragdollphysics.ragdollutil.MultiBodyRagdoll.printInitializationLogs;
+
 /**
  * Handles wobble physics for individual skeleton bones.
  * Provides hierarchy-aware bone movement with gravitational effects for limbs.
@@ -60,18 +62,20 @@ public class BoneWobble {
         this.isLimb = hasVisualAttachment && isAnatomicalLimbName(boneName);
         this.isLongLimb = this.isLimb;
 
-        if (isLongLimb) {
-            BaseMod.logger.info("[" + wobbleId + "] Created gravity-aware limb: "
-                    + bone.getData().getName() + " (depth: " + chainDepth
-                    + ", constraint: " + String.format("%.1f", baseRotationConstraint) + "°)");
-        } else if (hasVisualAttachment) {
-            BaseMod.logger.info("[" + wobbleId + "] Created visual bone: "
-                    + bone.getData().getName() + " (depth: " + chainDepth
-                    + ", constraint: " + String.format("%.1f", baseRotationConstraint) + "°)");
-        } else {
-            BaseMod.logger.info("[" + wobbleId + "] Created control bone: "
-                    + bone.getData().getName() + " (depth: " + chainDepth
-                    + ", constraint: " + String.format("%.1f", baseRotationConstraint) + "°)");
+        if (printInitializationLogs) {
+            if (isLongLimb) {
+                BaseMod.logger.info("[" + wobbleId + "] Created gravity-aware limb: "
+                        + bone.getData().getName() + " (depth: " + chainDepth
+                        + ", constraint: " + String.format("%.1f", baseRotationConstraint) + "°)");
+            } else if (hasVisualAttachment) {
+                BaseMod.logger.info("[" + wobbleId + "] Created visual bone: "
+                        + bone.getData().getName() + " (depth: " + chainDepth
+                        + ", constraint: " + String.format("%.1f", baseRotationConstraint) + "°)");
+            } else {
+                BaseMod.logger.info("[" + wobbleId + "] Created control bone: "
+                        + bone.getData().getName() + " (depth: " + chainDepth
+                        + ", constraint: " + String.format("%.1f", baseRotationConstraint) + "°)");
+            }
         }
     }
 

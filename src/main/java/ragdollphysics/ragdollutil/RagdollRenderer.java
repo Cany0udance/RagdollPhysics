@@ -103,7 +103,7 @@ public class RagdollRenderer {
         sb.setBlendFunction(770, 771);
 
         // NEW: Render debug squares
-        ragdoll.renderDebugSquares(sb);
+        RagdollDebugRenderer.renderDebugSquares(sb, ragdoll);
     }
 
     // Update the render method in RagdollRenderer class for image-based too
@@ -145,6 +145,6 @@ public class RagdollRenderer {
                 monster.flipVertical);
 
         // NEW: Render debug squares for image-based ragdolls too
-        ragdoll.renderDebugSquares(sb);
+        RagdollDebugRenderer.renderDebugSquares(sb, ragdoll);
     }
 }

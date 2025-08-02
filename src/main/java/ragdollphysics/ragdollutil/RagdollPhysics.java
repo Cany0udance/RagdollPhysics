@@ -13,8 +13,16 @@ public class RagdollPhysics {
     private final String physicsId;
     private int updateCount = 0;
 
+    // Physics constants
     private static final float SIMPLE_BOUNCE_THRESHOLD = 200f;
     private static final float GRAVITY = -1200f;
+    private static final float RIGHT_WALL_X = 1850f;
+    private static final float LEFT_WALL_X = 0f;
+    private static final float CEILING_Y = 1100f;
+
+    // Rotation tracking for limiting
+    public float totalRotationDegrees = 0f;
+    public float lastRotation = 0f;
 
     public RagdollPhysics(float startX, float startY, float forceX, float forceY, float groundLevel) {
         this.x = startX;
@@ -23,14 +31,10 @@ public class RagdollPhysics {
         this.velocityY = forceY;
         this.groundY = groundLevel;
         this.rotation = 0f;
-        this.angularVelocity = MathUtils.random(-144f, 144f); // Reduced from -720 to -144
+        this.angularVelocity = MathUtils.random(-144f, 144f);
         this.physicsId = "Physics_" + System.currentTimeMillis() % 10000;
-
-        BaseMod.logger.info("[" + physicsId + "] Created at ("
-                + String.format("%.1f", startX) + ", " + String.format("%.1f", startY)
-                + "), ground: " + groundLevel + ", initial force: ("
-                + String.format("%.1f", forceX) + ", " + String.format("%.1f", forceY)
-                + "), angVel: " + String.format("%.1f", angularVelocity));
+        this.lastRotation = 0f;
+        this.totalRotationDegrees = 0f;
     }
 
     public void update(float deltaTime, MultiBodyRagdoll parent) {
@@ -43,37 +47,37 @@ public class RagdollPhysics {
         y += velocityY * deltaTime;
         rotation += angularVelocity * deltaTime;
 
+        // Enhanced airborne rotation
+        float preUpdateVelocityY = velocityY;
+        if (y > groundY + 50f && preUpdateVelocityY > 200f) {
+            float airborneIntensity = Math.min(preUpdateVelocityY / 600f, 1.0f);
+            angularVelocity *= (1.0f + airborneIntensity * 0.02f);
+        }
+
+        // Wall collision handling
+        if (x > RIGHT_WALL_X && velocityX > 0) {
+            handleWallCollision(RIGHT_WALL_X, -0.4f);
+        }
+        if (x < LEFT_WALL_X && velocityX < 0) {
+            handleWallCollision(LEFT_WALL_X, -0.4f);
+        }
+
+        // Ceiling collision handling
+        if (y > CEILING_Y && velocityY > 0) {
+            handleCeilingCollision();
+        }
+
         // Ground collision handling
-        boolean groundEvent = false;
         if (y <= groundY && velocityY <= 0) {
             y = groundY;
-            groundEvent = true;
-
             if (Math.abs(velocityY) > SIMPLE_BOUNCE_THRESHOLD) {
-                float oldVelY = velocityY;
                 velocityY = Math.abs(velocityY) * 0.4f;
                 velocityX *= 0.8f;
                 angularVelocity *= 0.6f;
-
-                // Ground bounce is significant, always log
-                BaseMod.logger.info("[" + physicsId + "] MAIN BODY BOUNCE - impact: "
-                        + String.format("%.1f", oldVelY)
-                        + " -> bounce: " + String.format("%.1f", velocityY));
             } else {
-                float oldVelY = velocityY;
                 velocityY = 0f;
                 velocityX *= 0.92f;
                 angularVelocity *= 0.85f;
-
-                // Only log significant settling
-                if (Math.abs(oldVelY) > 30f || updateCount % 120 == 0) {
-                    if (parent.canLog()) {
-                        BaseMod.logger.info("[" + physicsId + "] Ground settle - impact: "
-                                + String.format("%.1f", oldVelY) + " -> 0, groundDist: "
-                                + String.format("%.2f", y - groundY));
-                        parent.lastLogTime = System.currentTimeMillis();
-                    }
-                }
             }
         } else {
             angularVelocity *= 0.999f;
@@ -82,18 +86,60 @@ public class RagdollPhysics {
         // Air resistance
         velocityX *= 0.999f;
 
-        // Only log regular updates occasionally
-        if (updateCount % 180 == 0 && parent.canLog()) {
-            BaseMod.logger.info("[" + physicsId + "] Regular update " + updateCount
-                    + " - pos: (" + String.format("%.1f", x) + ", "
-                    + String.format("%.1f", y) + "), vel: ("
-                    + String.format("%.1f", velocityX) + ", "
-                    + String.format("%.1f", velocityY)
-                    + "), rot: " + String.format("%.1f", rotation)
-                    + ", angVel: " + String.format("%.1f", angularVelocity)
-                    + ", groundDist: " + String.format("%.2f", y - groundY)
-                    + ", airborne: " + (y > groundY + 1f));
-            parent.lastLogTime = System.currentTimeMillis();
+        // Apply rotation limiting
+        applyRotationLimiting(deltaTime);
+    }
+
+    private void handleWallCollision(float wallX, float bounceMultiplier) {
+        x = wallX;
+        velocityX *= bounceMultiplier;
+        velocityY *= 0.7f;
+
+        // Add rotational effect from wall impact
+        float wallImpactIntensity = Math.abs(velocityX) / 800f;
+        angularVelocity += MathUtils.random(-90f, 90f) * (1.0f + wallImpactIntensity * 0.3f);
+    }
+
+    private void handleCeilingCollision() {
+        // Position at ceiling and reverse vertical velocity
+        y = CEILING_Y;
+        velocityY *= -0.6f; // Bounce downward with some energy loss
+
+        // Add rotational effect from ceiling impact
+        float ceilingImpactIntensity = Math.abs(velocityY) / 600f;
+        angularVelocity += MathUtils.random(-120f, 120f) * (1.0f + ceilingImpactIntensity * 0.4f);
+    }
+
+    private void applyRotationLimiting(float deltaTime) {
+        float rotationDelta = rotation - lastRotation;
+        if (rotationDelta > 180f)
+            rotationDelta -= 360f;
+        else if (rotationDelta < -180f)
+            rotationDelta += 360f;
+
+        boolean isActuallyOnGround = y <= groundY + 1f;
+        boolean hasVeryLowMomentum = Math.abs(velocityX) + Math.abs(velocityY) < 150f;
+        boolean isSettling = isActuallyOnGround && hasVeryLowMomentum;
+
+        if (isSettling) {
+            totalRotationDegrees += Math.abs(rotationDelta);
+            float flipsCompleted = totalRotationDegrees / 360f;
+            float dampingFactor = (float) Math.pow(0.98, flipsCompleted);
+            angularVelocity *= dampingFactor;
+        } else {
+            if (!isActuallyOnGround && Math.abs(velocityY) > 100f) {
+                totalRotationDegrees = 0f;
+            }
+            angularVelocity *= 0.9995f;
         }
+
+        lastRotation = rotation;
+    }
+
+    public boolean hasSettledOnGround() {
+        float totalMomentum = Math.abs(velocityX) + Math.abs(velocityY) + Math.abs(angularVelocity) / 10f;
+        boolean isLowMomentum = totalMomentum < 25f;
+        boolean isNearGround = y <= groundY + 10f;
+        return isLowMomentum && isNearGround;
     }
 }

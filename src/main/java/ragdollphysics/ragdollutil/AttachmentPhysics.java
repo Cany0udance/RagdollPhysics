@@ -18,11 +18,11 @@ public class AttachmentPhysics {
     public final float originalScaleX;
     public final float originalScaleY;
     private final String attachmentName;
-
     private static final float ATTACHMENT_BOUNCE_THRESHOLD = 150f;
-    private static final float GRAVITY = -1200f;
+    private static final float GRAVITY = -1200f; // default is -1200f
     private static final float RIGHT_WALL_X = 1850f;
-    private static final float LEFT_WALL_X = -200f;
+    private static final float LEFT_WALL_X = 0f;
+    private static final float CEILING_Y = 1100f;
 
     public AttachmentPhysics(float startX, float startY, float groundLevel, Bone bone,
                              Attachment attachment, String attachmentName) {
@@ -33,11 +33,9 @@ public class AttachmentPhysics {
         this.attachment = attachment;
         this.attachmentName = attachmentName;
         this.attachmentId = "Attachment_" + attachmentName + "_" + System.currentTimeMillis() % 1000;
-
         this.originalBone = bone;
         this.originalScaleX = bone.getScaleX();
         this.originalScaleY = bone.getScaleY();
-
         String attachmentType = attachment != null ? attachment.getClass().getSimpleName() : "Unknown";
         BaseMod.logger.info("[" + attachmentId + "] Created attachment '"
                 + attachmentName + "' (" + attachmentType + ") at ("
@@ -70,6 +68,20 @@ public class AttachmentPhysics {
             }
         } else {
             angularVelocity *= 0.999f;
+        }
+
+        // Ceiling collision
+        if (y > CEILING_Y && velocityY > 0) {
+            y = CEILING_Y;
+            if (Math.abs(velocityY) > ATTACHMENT_BOUNCE_THRESHOLD) {
+                velocityY *= -0.5f; // Slightly more bounce than ground
+                velocityX *= 0.9f;  // Less horizontal damping
+                angularVelocity = MathUtils.random(-450f, 450f); // Random spin on ceiling hit
+            } else {
+                velocityY = 0f;
+                velocityX *= 0.95f;
+                angularVelocity *= 0.8f;
+            }
         }
 
         // Wall collisions

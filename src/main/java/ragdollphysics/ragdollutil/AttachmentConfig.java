@@ -8,6 +8,7 @@ import com.megacrit.cardcrawl.monsters.exordium.SlaverRed;
 import java.util.HashMap;
 
 public class AttachmentConfig {
+    private static boolean printMatchingLogs = false; // Set to true to enable attachment matching debug logs
     private static final HashMap<String, String[]> MONSTER_ATTACHMENTS =
             new HashMap<>();
     private static final String[] GLOBAL_ATTACHMENTS = {"weapon", "sword",
@@ -20,7 +21,6 @@ public class AttachmentConfig {
         MONSTER_ATTACHMENTS.put(
                 Sentry.ID, new String[] {"top", "bottom", "jewel"});
         MONSTER_ATTACHMENTS.put(SlaverRed.ID, new String[] {"weponred", "net"});
-
         // FIXED: Use string literal "OrbWalker" instead of OrbWalker.ID
         MONSTER_ATTACHMENTS.put("OrbWalker",
                 new String[] {
@@ -35,9 +35,20 @@ public class AttachmentConfig {
                         "outline",
                 });
 
+        MONSTER_ATTACHMENTS.put("Repulsor",
+                new String[] {
+                        "orb",
+                        "head",
+                        "rib1",
+                        "rib2",
+                        "tailback",
+                        "tailfront"
+                });
         // DEBUG: Print what we configured
-        BaseMod.logger.info("STATIC CONFIG DEBUG: OrbWalker attachments = "
-                + java.util.Arrays.toString(MONSTER_ATTACHMENTS.get("OrbWalker")));
+        if (printMatchingLogs) {
+            BaseMod.logger.info("STATIC CONFIG DEBUG: OrbWalker attachments = "
+                    + java.util.Arrays.toString(MONSTER_ATTACHMENTS.get("OrbWalker")));
+        }
     }
 
     public static String[] getAttachmentsForMonster(String monsterName) {
@@ -48,47 +59,59 @@ public class AttachmentConfig {
             String monsterName, String attachmentName) {
         String attachmentLower = attachmentName.toLowerCase();
 
-        // DEBUG: Log what we're checking
-        BaseMod.logger.info("MATCHING DEBUG: Monster='" + monsterName
-                + "', Attachment='" + attachmentName + "'");
+        if (printMatchingLogs) {
+            BaseMod.logger.info("MATCHING DEBUG: Monster='" + monsterName
+                    + "', Attachment='" + attachmentName + "'");
+        }
 
         // Check global attachments first
         for (String globalAttachment : GLOBAL_ATTACHMENTS) {
             if (attachmentLower.contains(globalAttachment.toLowerCase())) {
-                BaseMod.logger.info("MATCHING DEBUG: Found global match for '"
-                        + attachmentName + "' with '" + globalAttachment + "'");
+                if (printMatchingLogs) {
+                    BaseMod.logger.info("MATCHING DEBUG: Found global match for '"
+                            + attachmentName + "' with '" + globalAttachment + "'");
+                }
                 return true;
             }
         }
 
         // Check monster-specific attachments
         String[] attachments = getAttachmentsForMonster(monsterName);
-        BaseMod.logger.info("MATCHING DEBUG: Monster-specific attachments: "
-                + java.util.Arrays.toString(attachments));
+        if (printMatchingLogs) {
+            BaseMod.logger.info("MATCHING DEBUG: Monster-specific attachments: "
+                    + java.util.Arrays.toString(attachments));
+        }
 
         for (String attachment : attachments) {
             String attachmentTarget = attachment.toLowerCase();
-
-            BaseMod.logger.info("MATCHING DEBUG: Comparing '" + attachmentLower
-                    + "' with '" + attachmentTarget + "'");
+            if (printMatchingLogs) {
+                BaseMod.logger.info("MATCHING DEBUG: Comparing '" + attachmentLower
+                        + "' with '" + attachmentTarget + "'");
+            }
 
             // Check exact match
             if (attachmentLower.equals(attachmentTarget)) {
-                BaseMod.logger.info(
-                        "MATCHING DEBUG: EXACT MATCH found for '" + attachmentName + "'");
+                if (printMatchingLogs) {
+                    BaseMod.logger.info(
+                            "MATCHING DEBUG: EXACT MATCH found for '" + attachmentName + "'");
+                }
                 return true;
             }
 
             // Check contains
             if (attachmentLower.contains(attachmentTarget)) {
-                BaseMod.logger.info("MATCHING DEBUG: CONTAINS MATCH found for '"
-                        + attachmentName + "' contains '" + attachmentTarget + "'");
+                if (printMatchingLogs) {
+                    BaseMod.logger.info("MATCHING DEBUG: CONTAINS MATCH found for '"
+                            + attachmentName + "' contains '" + attachmentTarget + "'");
+                }
                 return true;
             }
         }
 
-        BaseMod.logger.info(
-                "MATCHING DEBUG: NO MATCH found for '" + attachmentName + "'");
+        if (printMatchingLogs) {
+            BaseMod.logger.info(
+                    "MATCHING DEBUG: NO MATCH found for '" + attachmentName + "'");
+        }
         return false;
     }
 }
