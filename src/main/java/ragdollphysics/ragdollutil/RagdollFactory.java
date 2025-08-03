@@ -7,7 +7,10 @@ import com.esotericsoftware.spine.Skeleton;
 import com.esotericsoftware.spine.SkeletonRenderer;
 import com.esotericsoftware.spine.Slot;
 import com.esotericsoftware.spine.attachments.RegionAttachment;
+import com.megacrit.cardcrawl.core.Settings;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
+import com.megacrit.cardcrawl.monsters.beyond.TimeEater;
+import com.megacrit.cardcrawl.monsters.exordium.*;
 
 /**
  * Factory for creating ragdoll physics instances.
@@ -33,6 +36,23 @@ public class RagdollFactory {
     }
 
     /**
+     * Calculate custom ground level for specific monsters
+     */
+    private float calculateGroundLevel(AbstractMonster monster) {
+        float baseGroundLevel = monster.drawY;
+
+        // Apply monster-specific ground level adjustments
+        switch (monster.id) {
+            case TheGuardian.ID:
+                return baseGroundLevel + (100f * Settings.scale); // Raise Guardian's ground by 50 units
+            case Cultist.ID:
+                return baseGroundLevel + (20f * Settings.scale); // Raise Guardian's ground by 50 units
+            default:
+                return baseGroundLevel; // Use monster's current Y position as ground
+        }
+    }
+
+    /**
      * Main factory method - creates appropriate ragdoll type based on monster
      *
      * @param monster The monster to create a ragdoll for
@@ -42,7 +62,7 @@ public class RagdollFactory {
      */
     public MultiBodyRagdoll createRagdoll(AbstractMonster monster, ReflectionHelper reflectionHelper) throws Exception {
         ragdollsCreated++;
-        String monsterName = monster.getClass().getSimpleName();
+        String monsterName = monster.id;
 
         if (printFactoryLogs) {
             BaseMod.logger.info("[" + factoryId + "] === RAGDOLL CREATION #" + ragdollsCreated + " ===");
@@ -79,20 +99,27 @@ public class RagdollFactory {
     }
 
     /**
-     * Create ragdoll for image-based monsters (like Hexaghost)
+     * Create ragdoll for image-based monsters (like Hexaghost) - UPDATED
      */
     private MultiBodyRagdoll createImageRagdoll(AbstractMonster monster) throws Exception {
-        String monsterName = monster.getClass().getSimpleName();
-
+        String monsterName = monster.id;
         if (printFactoryLogs) {
             BaseMod.logger.info("[" + factoryId + "] Creating image ragdoll for " + monsterName);
         }
 
         try {
+            float customGroundLevel = calculateGroundLevel(monster);
+
+            if (printFactoryLogs && customGroundLevel != monster.drawY) {
+                BaseMod.logger.info("[" + factoryId + "] Applied custom ground level for " + monsterName
+                        + ": " + monster.drawY + " -> " + customGroundLevel
+                        + " (offset: " + (customGroundLevel - monster.drawY) + ")");
+            }
+
             MultiBodyRagdoll ragdoll = new MultiBodyRagdoll(
                     monster.drawX,
                     monster.drawY,
-                    monster.drawY,  // ground level
+                    customGroundLevel,  // Use calculated ground level
                     monsterName,
                     monster
             );
@@ -107,11 +134,10 @@ public class RagdollFactory {
     }
 
     /**
-     * Create ragdoll for skeleton-based monsters (normal case)
+     * Create ragdoll for skeleton-based monsters (normal case) - UPDATED
      */
     private MultiBodyRagdoll createSkeletonRagdoll(AbstractMonster monster, ReflectionHelper reflectionHelper) throws Exception {
-        String monsterName = monster.getClass().getSimpleName();
-
+        String monsterName = monster.id;
         if (printFactoryLogs) {
             BaseMod.logger.info("[" + factoryId + "] Creating skeleton ragdoll for " + monsterName);
         }
@@ -131,12 +157,20 @@ public class RagdollFactory {
                 throw new Exception("SkeletonRenderer is null");
             }
 
+            float customGroundLevel = calculateGroundLevel(monster);
+
+            if (printFactoryLogs && customGroundLevel != monster.drawY) {
+                BaseMod.logger.info("[" + factoryId + "] Applied custom ground level for " + monsterName
+                        + ": " + monster.drawY + " -> " + customGroundLevel
+                        + " (offset: " + (customGroundLevel - monster.drawY) + ")");
+            }
+
             // Create the ragdoll with skeleton
             MultiBodyRagdoll ragdoll = new MultiBodyRagdoll(
                     skeleton,
-                    monster.drawY,      // ground level
-                    monster.drawX,      // start X
-                    monster.drawY,      // start Y
+                    customGroundLevel,   // Use calculated ground level
+                    monster.drawX,       // start X
+                    monster.drawY,       // start Y
                     monsterName,
                     monster
             );
@@ -166,7 +200,7 @@ public class RagdollFactory {
         int visualBones = 0;
         int controlBones = 0;
         int attachmentBones = 0;
-        String monsterName = monster.getClass().getSimpleName();
+        String monsterName = monster.id;
 
         for (Bone bone : skeleton.getBones()) {
             // Create bone wobble with hierarchy information

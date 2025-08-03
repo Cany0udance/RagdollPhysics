@@ -44,6 +44,8 @@ public class PhysicsModifier {
         ENEMY_WEIGHTS.put(Repulsor.ID, EnemyWeight.LIGHT);
         ENEMY_WEIGHTS.put(Spiker.ID, EnemyWeight.LIGHT);
         ENEMY_WEIGHTS.put(Exploder.ID, EnemyWeight.LIGHT);
+        ENEMY_WEIGHTS.put(BronzeOrb.ID, EnemyWeight.LIGHT);
+        ENEMY_WEIGHTS.put(SnakeDagger.ID, EnemyWeight.LIGHT);
 
         // Medium enemies (baseline behavior)
         ENEMY_WEIGHTS.put(Cultist.ID, EnemyWeight.MEDIUM);

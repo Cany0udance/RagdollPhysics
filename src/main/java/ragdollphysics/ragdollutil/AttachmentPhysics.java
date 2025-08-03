@@ -5,6 +5,8 @@ import com.badlogic.gdx.math.MathUtils;
 import com.esotericsoftware.spine.Bone;
 import com.esotericsoftware.spine.attachments.Attachment;
 
+import static ragdollphysics.RagdollPhysics.enableZeroGravity;
+
 /**
  * Physics simulation for detached monster attachments (weapons, armor pieces, etc.).
  * Handles independent physics movement for attachments that break away from bones.
@@ -46,10 +48,12 @@ public class AttachmentPhysics {
     }
 
     public void update(float deltaTime) {
-        deltaTime = Math.min(deltaTime, 1.0f / 30.0f);
-
         // Apply gravity and update position
-        velocityY += GRAVITY * deltaTime;
+        if (enableZeroGravity) {
+            velocityY += 0f * deltaTime;
+        } else {
+            velocityY += GRAVITY * deltaTime;
+        }
         x += velocityX * deltaTime;
         y += velocityY * deltaTime;
         rotation += angularVelocity * deltaTime;
@@ -63,28 +67,31 @@ public class AttachmentPhysics {
                 angularVelocity *= 0.6f;
             } else {
                 velocityY = 0f;
-                velocityX *= 0.95f;
-                angularVelocity *= 0.7f;
+                // Frame-rate independent ground damping
+                velocityX *= (float) Math.pow(0.95, deltaTime * 60f);
+                angularVelocity *= (float) Math.pow(0.7, deltaTime * 60f);
             }
         } else {
-            angularVelocity *= 0.999f;
+            // Frame-rate independent air angular damping
+            angularVelocity *= (float) Math.pow(0.999, deltaTime * 60f);
         }
 
         // Ceiling collision
         if (y > CEILING_Y && velocityY > 0) {
             y = CEILING_Y;
             if (Math.abs(velocityY) > ATTACHMENT_BOUNCE_THRESHOLD) {
-                velocityY *= -0.5f; // Slightly more bounce than ground
-                velocityX *= 0.9f;  // Less horizontal damping
-                angularVelocity = MathUtils.random(-450f, 450f); // Random spin on ceiling hit
+                velocityY *= -0.5f;
+                velocityX *= 0.9f;
+                angularVelocity = MathUtils.random(-450f, 450f);
             } else {
                 velocityY = 0f;
-                velocityX *= 0.95f;
-                angularVelocity *= 0.8f;
+                // Frame-rate independent ceiling damping
+                velocityX *= (float) Math.pow(0.95, deltaTime * 60f);
+                angularVelocity *= (float) Math.pow(0.8, deltaTime * 60f);
             }
         }
 
-        // Wall collisions
+        // Wall collisions (instant response - no damping needed)
         if (x > RIGHT_WALL_X && velocityX > 0) {
             x = RIGHT_WALL_X;
             velocityX *= -0.7f;
@@ -96,7 +103,7 @@ public class AttachmentPhysics {
             angularVelocity = MathUtils.random(-360f, 360f);
         }
 
-        // Air resistance
-        velocityX *= 0.999f;
+        // Frame-rate independent air resistance
+        velocityX *= (float) Math.pow(0.999, deltaTime * 60f);
     }
 }

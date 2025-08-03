@@ -3,6 +3,8 @@ package ragdollphysics.ragdollutil;
 import basemod.BaseMod;
 import com.badlogic.gdx.math.MathUtils;
 
+import static ragdollphysics.RagdollPhysics.enableZeroGravity;
+
 /**
  * Core physics simulation for ragdoll bodies.
  * Handles position, velocity, rotation, and ground/wall collisions.
@@ -39,19 +41,23 @@ public class RagdollPhysics {
 
     public void update(float deltaTime, MultiBodyRagdoll parent) {
         updateCount++;
-        deltaTime = Math.min(deltaTime, 1.0f / 30.0f);
 
-        // Apply gravity and update position
-        velocityY += GRAVITY * deltaTime;
+        if (enableZeroGravity) {
+            velocityY += 0f * deltaTime;
+        } else {
+            velocityY += GRAVITY * deltaTime;
+        }
         x += velocityX * deltaTime;
         y += velocityY * deltaTime;
         rotation += angularVelocity * deltaTime;
 
-        // Enhanced airborne rotation
+        // Enhanced airborne rotation - frame rate independent
         float preUpdateVelocityY = velocityY;
         if (y > groundY + 50f && preUpdateVelocityY > 200f) {
             float airborneIntensity = Math.min(preUpdateVelocityY / 600f, 1.0f);
-            angularVelocity *= (1.0f + airborneIntensity * 0.02f);
+            // Time-based airborne enhancement
+            float airborneBoost = 1.0f + (airborneIntensity * 0.02f * deltaTime * 60f);
+            angularVelocity *= airborneBoost;
         }
 
         // Wall collision handling
@@ -76,15 +82,17 @@ public class RagdollPhysics {
                 angularVelocity *= 0.6f;
             } else {
                 velocityY = 0f;
-                velocityX *= 0.92f;
-                angularVelocity *= 0.85f;
+                // Frame-rate independent ground friction
+                velocityX *= (float) Math.pow(0.92, deltaTime * 60f);
+                angularVelocity *= (float) Math.pow(0.85, deltaTime * 60f);
             }
         } else {
-            angularVelocity *= 0.999f;
+            // Frame-rate independent air damping
+            angularVelocity *= (float) Math.pow(0.999, deltaTime * 60f);
         }
 
-        // Air resistance
-        velocityX *= 0.999f;
+        // Frame-rate independent air resistance
+        velocityX *= (float) Math.pow(0.999, deltaTime * 60f);
 
         // Apply rotation limiting
         applyRotationLimiting(deltaTime);
@@ -124,13 +132,15 @@ public class RagdollPhysics {
         if (isSettling) {
             totalRotationDegrees += Math.abs(rotationDelta);
             float flipsCompleted = totalRotationDegrees / 360f;
-            float dampingFactor = (float) Math.pow(0.98, flipsCompleted);
-            angularVelocity *= dampingFactor;
+            // Time-based damping based on flips
+            float dampingStrength = 0.02f * flipsCompleted * deltaTime * 60f;
+            angularVelocity *= (1.0f - Math.min(dampingStrength, 0.3f));
         } else {
             if (!isActuallyOnGround && Math.abs(velocityY) > 100f) {
                 totalRotationDegrees = 0f;
             }
-            angularVelocity *= 0.9995f;
+            // Frame-rate independent general angular damping
+            angularVelocity *= (float) Math.pow(0.9995, deltaTime * 60f);
         }
 
         lastRotation = rotation;

@@ -5,14 +5,13 @@ import com.esotericsoftware.spine.Bone;
 import com.esotericsoftware.spine.Skeleton;
 import com.esotericsoftware.spine.Slot;
 import com.megacrit.cardcrawl.core.Settings;
-import com.megacrit.cardcrawl.monsters.exordium.Cultist;
-import com.megacrit.cardcrawl.monsters.exordium.SlaverBlue;
+import com.megacrit.cardcrawl.monsters.exordium.*;
 
 import java.util.HashMap;
 
 public class CenterOfMassConfig {
     // Control logging for center of mass calculations
-    private static boolean printCenterOfMassLogs = false; // Set to true to enable logs
+    private static boolean printCenterOfMassLogs = true; // Set to true to enable logs
 
     // Map of monster class names to their specific body attachment names
     public static final HashMap<String, String> customBodyAttachments = new HashMap<>();
@@ -21,6 +20,8 @@ public class CenterOfMassConfig {
         // The system will find the bone associated with these attachments
         customBodyAttachments.put(Cultist.ID, "body");
         customBodyAttachments.put(SlaverBlue.ID, "cloakblue");
+      //  customBodyAttachments.put(LouseNormal.ID, "seg3");
+      //  customBodyAttachments.put(LouseDefensive.ID, "seg3");
     }
 
     // Calculate center of mass offset based on actual skeleton body bone position
@@ -152,8 +153,8 @@ public class CenterOfMassConfig {
     private static CenterOffset getFallbackOffset(String monsterClassName) {
         // Fallback static offsets for monsters without clear body bones
         switch (monsterClassName) {
-            case "JawWorm":
-                return new CenterOffset(0f, 60f * Settings.scale);
+            case TheGuardian.ID:
+                return new CenterOffset(0f, -60f * Settings.scale);
             default:
                 return new CenterOffset(0f, 60f * Settings.scale);
         }

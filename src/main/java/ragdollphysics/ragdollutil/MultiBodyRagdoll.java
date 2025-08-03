@@ -49,7 +49,8 @@ public class MultiBodyRagdoll {
     private float settledTimer = 0f;
     public float totalRotationDegrees = 0f;
     public float lastRotation = 0f;
-
+    private static final float MIN_PHYSICS_TIMESTEP = 1.0f / 60.0f; // Minimum 60Hz
+    private static final float MAX_PHYSICS_TIMESTEP = 1.0f / 30.0f; // Don't go slower than 30Hz
     private static final float FIXED_TIMESTEP = 1.0f / 60.0f;
     private float accumulator = 0f;
     private final String monsterClassName;
@@ -282,13 +283,24 @@ public class MultiBodyRagdoll {
             lastLogTime = System.currentTimeMillis();
         }
 
-        accumulator += Math.min(deltaTime, 0.1f);
+        // Clamp deltaTime to prevent huge timesteps that break physics
+        deltaTime = Math.min(deltaTime, MAX_PHYSICS_TIMESTEP);
+
+        // Calculate adaptive timestep - smaller timesteps for higher framerates
+        float physicsTimestep = Math.max(deltaTime, MIN_PHYSICS_TIMESTEP);
+
+        accumulator += deltaTime;
         int steps = 0;
-        while (accumulator >= FIXED_TIMESTEP) {
+
+        while (accumulator >= physicsTimestep) {
             steps++;
             physicsStepCount++;
-            updatePhysics(FIXED_TIMESTEP);
-            accumulator -= FIXED_TIMESTEP;
+            updatePhysics(physicsTimestep);
+            accumulator -= physicsTimestep;
+
+            // Recalculate timestep each iteration in case frame rate changed
+            physicsTimestep = Math.max(MIN_PHYSICS_TIMESTEP, accumulator);
+
             if (steps > 10) { // Prevent infinite loops
                 BaseMod.logger.warn("[" + ragdollId + "] Breaking physics loop after "
                         + steps + " steps");
@@ -299,7 +311,8 @@ public class MultiBodyRagdoll {
 
         if (steps > 0 && printUpdateLogs && canLog()) {
             BaseMod.logger.info("[" + ragdollId + "] Executed " + steps
-                    + " physics steps (total: " + physicsStepCount + ")");
+                    + " physics steps with timestep " + String.format("%.4f", physicsTimestep)
+                    + " (total: " + physicsStepCount + ")");
         }
     }
 

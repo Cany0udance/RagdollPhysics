@@ -1,9 +1,14 @@
 package ragdollphysics;
 
 import basemod.BaseMod;
+import basemod.ModLabeledToggleButton;
+import basemod.ModPanel;
 import basemod.interfaces.EditKeywordsSubscriber;
 import basemod.interfaces.EditStringsSubscriber;
 import basemod.interfaces.PostInitializeSubscriber;
+import com.evacipated.cardcrawl.modthespire.lib.SpireConfig;
+import com.megacrit.cardcrawl.core.CardCrawlGame;
+import com.megacrit.cardcrawl.helpers.FontHelper;
 import ragdollphysics.util.GeneralUtils;
 import ragdollphysics.util.KeywordInfo;
 import ragdollphysics.util.TextureLoader;
@@ -24,6 +29,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.scannotation.AnnotationDB;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -37,14 +43,22 @@ public class RagdollPhysics implements
     private static final String resourcesFolder = checkResourcesPath();
     public static final Logger logger = LogManager.getLogger(modID); //Used to output to the console.
 
-    //This is used to prefix the IDs of various objects like cards and relics,
-    //to avoid conflicts between different mods using the same name for things.
+    private static SpireConfig config;
+    public static boolean enableZeroGravity;
+    public static boolean enableDebugSquares;
+
     public static String makeID(String id) {
         return modID + ":" + id;
     }
 
     //This will be called by ModTheSpire because of the @SpireInitializer annotation at the top of the class.
-    public static void initialize() {
+    public static void initialize() throws IOException {
+        Properties defaults = new Properties();
+        defaults.setProperty("enableZeroGravity", "false");
+        defaults.setProperty("enableDebugSqures", "false");
+        config = new SpireConfig(modID, "config", defaults);
+        enableZeroGravity = config.getBool("enableZeroGravity");
+        enableDebugSquares = config.getBool("enableDebugSquares");
         new RagdollPhysics();
     }
 
@@ -55,14 +69,28 @@ public class RagdollPhysics implements
 
     @Override
     public void receivePostInitialize() {
-        //This loads the image used as an icon in the in-game mods menu.
-        Texture badgeTexture = TextureLoader.getTexture(imagePath("badge.png"));
-        //Set up the mod information displayed in the in-game mods menu.
-        //The information used is taken from your pom.xml file.
+        ModPanel settingsPanel = new ModPanel();
 
-        //If you want to set up a config panel, that will be done here.
-        //The Mod Badges page has a basic example of this, but setting up config is overall a bit complex.
-        BaseMod.registerModBadge(badgeTexture, info.Name, GeneralUtils.arrToString(info.Authors), info.Description, null);
+        String toggleText1 = "Enable zero gravity mode";
+        String toggleText2 = "Enable debug squares";
+
+
+        // Always display names toggle
+        settingsPanel.addUIElement(new ModLabeledToggleButton(toggleText1, 350, 700, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableZeroGravity"), settingsPanel, label -> {}, button -> {
+            enableZeroGravity = button.enabled;
+            config.setBool("enableZeroGravity", button.enabled);
+            try {config.save();} catch (Exception e) {}
+        }));
+
+        // Should name bosses toggle
+        settingsPanel.addUIElement(new ModLabeledToggleButton(toggleText2, 350, 650, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableDebugSquares"), settingsPanel, label -> {}, button -> {
+            enableDebugSquares = button.enabled;
+            config.setBool("enableDebugSquares", button.enabled);
+            try {config.save();} catch (Exception e) {}
+        }));
+
+        Texture badgeTexture = TextureLoader.getTexture(imagePath("badge.png"));
+        BaseMod.registerModBadge(badgeTexture, info.Name, GeneralUtils.arrToString(info.Authors), info.Description, settingsPanel);
     }
 
     /*----------Localization----------*/
