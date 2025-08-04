@@ -48,7 +48,7 @@ public class RagdollFactory {
             case Cultist.ID:
                 return baseGroundLevel + (20f * Settings.scale); // Raise Guardian's ground by 50 units
             default:
-                return baseGroundLevel; // Use monster's current Y position as ground
+                return baseGroundLevel;
         }
     }
 

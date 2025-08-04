@@ -20,8 +20,8 @@ public class CenterOfMassConfig {
         // The system will find the bone associated with these attachments
         customBodyAttachments.put(Cultist.ID, "body");
         customBodyAttachments.put(SlaverBlue.ID, "cloakblue");
-      //  customBodyAttachments.put(LouseNormal.ID, "seg3");
-      //  customBodyAttachments.put(LouseDefensive.ID, "seg3");
+        customBodyAttachments.put(LouseNormal.ID, "seg3");
+        customBodyAttachments.put(LouseDefensive.ID, "seg3");
     }
 
     // Calculate center of mass offset based on actual skeleton body bone position
