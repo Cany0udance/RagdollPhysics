@@ -51,14 +51,18 @@ public class RagdollPhysics {
         y += velocityY * deltaTime;
         rotation += angularVelocity * deltaTime;
 
-        // Enhanced airborne rotation - frame rate independent
         float preUpdateVelocityY = velocityY;
-        if (y > groundY + 50f && preUpdateVelocityY > 200f) {
+        boolean hasContactedGround = y <= groundY + 5f;
+
+// Only apply airborne rotation enhancement while actually airborne
+        if (!hasContactedGround && preUpdateVelocityY > 200f) {
             float airborneIntensity = Math.min(preUpdateVelocityY / 600f, 1.0f);
             // Time-based airborne enhancement
             float airborneBoost = 1.0f + (airborneIntensity * 0.02f * deltaTime * 60f);
             angularVelocity *= airborneBoost;
         }
+
+
 
         // Wall collision handling
         if (x > RIGHT_WALL_X && velocityX > 0) {
@@ -136,7 +140,8 @@ public class RagdollPhysics {
             float dampingStrength = 0.02f * flipsCompleted * deltaTime * 60f;
             angularVelocity *= (1.0f - Math.min(dampingStrength, 0.3f));
         } else {
-            if (!isActuallyOnGround && Math.abs(velocityY) > 100f) {
+            // Reset rotation tracking when enemy becomes airborne again or has significant velocity
+            if (!isActuallyOnGround || Math.abs(velocityY) > 100f) {
                 totalRotationDegrees = 0f;
             }
             // Frame-rate independent general angular damping

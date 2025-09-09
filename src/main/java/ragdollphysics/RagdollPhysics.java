@@ -72,7 +72,7 @@ public class RagdollPhysics implements
         ModPanel settingsPanel = new ModPanel();
 
         String toggleText1 = "Enable zero gravity mode";
-        String toggleText2 = "Enable debug squares";
+        String toggleText2 = "Enable debug squares (requires restart)";
 
 
         // Always display names toggle

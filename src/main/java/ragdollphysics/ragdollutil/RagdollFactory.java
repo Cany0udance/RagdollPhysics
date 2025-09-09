@@ -44,11 +44,11 @@ public class RagdollFactory {
         // Apply monster-specific ground level adjustments
         switch (monster.id) {
             case TheGuardian.ID:
-                return baseGroundLevel + (100f * Settings.scale); // Raise Guardian's ground by 50 units
+                return baseGroundLevel + (100f * Settings.scale);
             case Cultist.ID:
-                return baseGroundLevel + (20f * Settings.scale); // Raise Guardian's ground by 50 units
+                return baseGroundLevel + (20f * Settings.scale);
             default:
-                return baseGroundLevel;
+                return baseGroundLevel + (20f * Settings.scale);
         }
     }
 
