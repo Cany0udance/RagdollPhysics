@@ -217,7 +217,11 @@ public class RagdollFactory {
             String boneName = bone.getData().getName().toLowerCase();
 
             // Check if this bone will become a detached attachment
-            boolean willBeDetached = willBoneBeDetached(bone, skeleton, monsterName);
+            // Get overkill damage first
+            float overkillDamage = OverkillTracker.getOverkillDamage(monster);
+
+            // Then use it in the bone check
+            boolean willBeDetached = willBoneBeDetached(bone, skeleton, monsterName, overkillDamage);
             boolean isVisualLimb = hasVisualAttachment
                     && boneName.matches("^(arm|leg|wing)(_bg|_fg|l|r|left|right)?$");
 
@@ -285,12 +289,12 @@ public class RagdollFactory {
     /**
      * Check if a bone will have its attachment detached for physics
      */
-    private boolean willBoneBeDetached(Bone bone, Skeleton skeleton, String monsterName) {
+    private boolean willBoneBeDetached(Bone bone, Skeleton skeleton, String monsterName, float overkillDamage) {
         for (Slot slot : skeleton.getSlots()) {
             if (slot.getBone() == bone && slot.getAttachment() instanceof RegionAttachment) {
                 RegionAttachment regionAttachment = (RegionAttachment) slot.getAttachment();
                 String attachmentName = regionAttachment.getName();
-                if (AttachmentConfig.shouldDetachAttachment(monsterName, attachmentName)) {
+                if (AttachmentConfig.shouldDetachAttachment(monsterName, attachmentName, overkillDamage)) {
                     return true;
                 }
             }

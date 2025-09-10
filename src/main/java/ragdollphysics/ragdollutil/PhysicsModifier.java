@@ -57,6 +57,8 @@ public class PhysicsModifier {
         ENEMY_WEIGHTS.put(SlaverBlue.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(Looter.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(Mugger.ID, EnemyWeight.MEDIUM);
+        ENEMY_WEIGHTS.put(BanditLeader.ID, EnemyWeight.MEDIUM);
+        ENEMY_WEIGHTS.put(BanditPointy.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(SphericGuardian.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(Chosen.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(ShelledParasite.ID, EnemyWeight.MEDIUM);
@@ -70,6 +72,7 @@ public class PhysicsModifier {
         // Heavy enemies (barely budge)
         ENEMY_WEIGHTS.put(SpikeSlime_L.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(AcidSlime_L.ID, EnemyWeight.HEAVY);
+        ENEMY_WEIGHTS.put(BanditBear.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(Maw.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(WrithingMass.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(SpireGrowth.ID, EnemyWeight.HEAVY);

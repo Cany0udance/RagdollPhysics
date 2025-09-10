@@ -153,15 +153,20 @@ public class MultiBodyRagdoll {
                     + skeleton.getBones().size + " bones");
         }
 
-        int attachmentCount = 0;
+        // In MultiBodyRagdoll constructor, around line 120, replace this section:
 
-        // Handle attachments - use ORIGINAL startX/Y for bone positioning
+        int attachmentCount = 0;
+// Get overkill damage for dismemberment calculations
+        float overkillDamage = OverkillTracker.getOverkillDamage(monster);
+
+// Handle attachments - use ORIGINAL startX/Y for bone positioning
         for (Slot slot : skeleton.getSlots()) {
             if (slot.getAttachment() != null) {
                 String attachmentName = slot.getAttachment().getName();
                 Bone bone = slot.getBone();
 
-                boolean shouldDetach = AttachmentConfig.shouldDetachAttachment(monsterClassName, attachmentName);
+                // Use the updated method that includes dismemberment logic
+                boolean shouldDetach = AttachmentConfig.shouldDetachAttachment(monsterClassName, attachmentName, overkillDamage);
 
                 if (shouldDetach) {
                     attachmentBodies.put(attachmentName,
@@ -169,13 +174,13 @@ public class MultiBodyRagdoll {
                                     startX + bone.getWorldX() * Settings.scale,
                                     startY + bone.getWorldY() * Settings.scale, groundLevel,
                                     bone, slot.getAttachment(), attachmentName));
-
                     attachmentCount++;
                     if (printInitializationLogs) {
                         String attachmentType = slot.getAttachment().getClass().getSimpleName();
                         BaseMod.logger.info("[" + ragdollId + "] Found detachable "
                                 + attachmentType + ": '" + attachmentName
-                                + "' on bone: " + bone.getData().getName());
+                                + "' on bone: " + bone.getData().getName()
+                                + " (overkill: " + String.format("%.1f", overkillDamage) + ")");
                     }
                 }
             }

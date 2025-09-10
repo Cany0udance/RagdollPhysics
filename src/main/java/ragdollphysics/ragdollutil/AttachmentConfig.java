@@ -8,27 +8,30 @@ import com.esotericsoftware.spine.attachments.RegionAttachment;
 import com.megacrit.cardcrawl.monsters.beyond.OrbWalker;
 import com.megacrit.cardcrawl.monsters.beyond.Repulsor;
 import com.megacrit.cardcrawl.monsters.beyond.TimeEater;
+import com.megacrit.cardcrawl.monsters.exordium.Cultist;
 import com.megacrit.cardcrawl.monsters.exordium.Sentry;
 import com.megacrit.cardcrawl.monsters.exordium.SlaverRed;
 import com.megacrit.cardcrawl.monsters.exordium.TheGuardian;
 
 import java.util.HashMap;
+import java.util.Random;
 
 public class AttachmentConfig {
-    private static boolean printMatchingLogs = false; // Set to true to enable attachment matching debug logs
-    private static final HashMap<String, String[]> MONSTER_ATTACHMENTS =
-            new HashMap<>();
+    private static boolean printMatchingLogs = false;
+    private static boolean forceDismemberment = false; // Set to true for 100% dismemberment chance (testing)
+
+    private static final HashMap<String, String[]> MONSTER_ATTACHMENTS = new HashMap<>();
+    private static final HashMap<String, String[]> DISMEMBERABLE_PARTS = new HashMap<>();
     private static final String[] GLOBAL_ATTACHMENTS = {"weapon", "sword",
             "blade", "staff", "wand", "rod", "dagger", "spear", "axe", "club",
             "mace", "bow", "shield", "orb", "crystal", "gem", "whip"};
+    private static final Random random = new Random();
 
     static {
-        // Configure which attachments should be physics bodies per monster
+        // Configure attachments that ALWAYS detach
         MONSTER_ATTACHMENTS.put(TimeEater.ID, new String[] {"clock"});
-        MONSTER_ATTACHMENTS.put(
-                Sentry.ID, new String[] {"top", "bottom", "jewel"});
+        MONSTER_ATTACHMENTS.put(Sentry.ID, new String[] {"top", "bottom", "jewel"});
         MONSTER_ATTACHMENTS.put(SlaverRed.ID, new String[] {"weponred", "net"});
-        // FIXED: Use string literal "OrbWalker" instead of OrbWalker.ID
         MONSTER_ATTACHMENTS.put(OrbWalker.ID,
                 new String[] {
                         "orb",
@@ -38,7 +41,7 @@ public class AttachmentConfig {
                         "head_se",
                         "head_nw",
                         "head_ne",
-                        "head_bg", // This wasn't matching before
+                        "head_bg",
                         "outline",
                 });
 
@@ -54,15 +57,12 @@ public class AttachmentConfig {
 
         MONSTER_ATTACHMENTS.put(TheGuardian.ID,
                 new String[] {
-                        // Defensive parts
                         "b2", "b3", "b4", "b5", "b6", "b7", "b8",
                         "base", "body", "core",
                         "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10",
                         "f11", "f12", "f13", "f14", "f15", "f16",
                         "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10",
                         "m11", "m12", "m13", "m14",
-
-                        // Idle parts
                         "bgBody", "fgBody",
                         "left_foot", "left_leg",
                         "leftarmbg1", "leftarmbg2", "leftarmbg3", "leftarmbg4", "leftarmbg5",
@@ -73,7 +73,10 @@ public class AttachmentConfig {
                         "rightarmfg1", "rightarmfg2", "rightarmfg3", "rightarmfg4", "rightarmfg5",
                         "rightarmfg6", "rightarmfg7", "rightarmfg8", "rightarmfg9", "rightarmfg10"
                 });
-        // DEBUG: Print what we configured
+
+        // Configure parts that have a CHANCE to detach based on overkill
+        DISMEMBERABLE_PARTS.put(Cultist.ID, new String[] {"head"});
+
         if (printMatchingLogs) {
             BaseMod.logger.info("STATIC CONFIG DEBUG: OrbWalker attachments = "
                     + java.util.Arrays.toString(MONSTER_ATTACHMENTS.get("OrbWalker")));
@@ -84,8 +87,12 @@ public class AttachmentConfig {
         return MONSTER_ATTACHMENTS.getOrDefault(monsterName, new String[0]);
     }
 
-    public static boolean shouldDetachAttachment(
-            String monsterName, String attachmentName) {
+    public static String[] getDismemberablePartsForMonster(String monsterName) {
+        return DISMEMBERABLE_PARTS.getOrDefault(monsterName, new String[0]);
+    }
+
+    // Original method for guaranteed attachments only
+    public static boolean shouldDetachAttachment(String monsterName, String attachmentName) {
         String attachmentLower = attachmentName.toLowerCase();
 
         if (printMatchingLogs) {
@@ -118,34 +125,72 @@ public class AttachmentConfig {
                         + "' with '" + attachmentTarget + "'");
             }
 
-            // Check exact match
-            if (attachmentLower.equals(attachmentTarget)) {
+            if (attachmentLower.equals(attachmentTarget) || attachmentLower.contains(attachmentTarget)) {
                 if (printMatchingLogs) {
-                    BaseMod.logger.info(
-                            "MATCHING DEBUG: EXACT MATCH found for '" + attachmentName + "'");
-                }
-                return true;
-            }
-
-            // Check contains
-            if (attachmentLower.contains(attachmentTarget)) {
-                if (printMatchingLogs) {
-                    BaseMod.logger.info("MATCHING DEBUG: CONTAINS MATCH found for '"
-                            + attachmentName + "' contains '" + attachmentTarget + "'");
+                    BaseMod.logger.info("MATCHING DEBUG: MATCH found for '" + attachmentName + "'");
                 }
                 return true;
             }
         }
 
         if (printMatchingLogs) {
-            BaseMod.logger.info(
-                    "MATCHING DEBUG: NO MATCH found for '" + attachmentName + "'");
+            BaseMod.logger.info("MATCHING DEBUG: NO MATCH found for '" + attachmentName + "'");
         }
         return false;
     }
 
+    // New overloaded method that includes dismemberment logic
+    public static boolean shouldDetachAttachment(String monsterName, String attachmentName, float overkillDamage) {
+        // First check if it's a guaranteed attachment
+        if (shouldDetachAttachment(monsterName, attachmentName)) {
+            return true;
+        }
+
+        // Then check if it should be dismembered
+        return shouldDismember(monsterName, attachmentName, overkillDamage);
+    }
+
+    private static boolean shouldDismember(String monsterName, String attachmentName, float overkillDamage) {
+        String[] dismemberableParts = getDismemberablePartsForMonster(monsterName);
+        String attachmentLower = attachmentName.toLowerCase();
+
+        for (String part : dismemberableParts) {
+            String partLower = part.toLowerCase();
+
+            if (attachmentLower.equals(partLower) || attachmentLower.contains(partLower)) {
+                // Check if we're forcing dismemberment for testing
+                if (forceDismemberment) {
+                    BaseMod.logger.info("DISMEMBERMENT: " + attachmentName + " from " + monsterName
+                            + " - FORCED DISMEMBERMENT (testing mode, overkill: "
+                            + String.format("%.1f", overkillDamage) + ")");
+                    return true;
+                }
+
+                // Normal mode: require 25+ overkill damage
+                if (overkillDamage < 25f) {
+                    return false;
+                }
+
+                // Calculate normal dismemberment chance: 2% at 25 overkill, 50% at 50 overkill
+                float chance = Math.min(2f + (overkillDamage - 25f) * (48f / 25f), 50f) / 100f;
+                boolean dismembered = random.nextFloat() < chance;
+
+                if (printMatchingLogs || dismembered) {
+                    BaseMod.logger.info("DISMEMBERMENT: " + attachmentName + " from " + monsterName
+                            + " - Overkill: " + String.format("%.1f", overkillDamage)
+                            + ", Chance: " + String.format("%.1f%%", chance * 100)
+                            + ", Result: " + (dismembered ? "DISMEMBERED" : "intact"));
+                }
+
+                return dismembered;
+            }
+        }
+
+        return false;
+    }
+
     public static void debugAttachmentScaling(String monsterName, Skeleton skeleton) {
-        if (!monsterName.equals(TheGuardian.ID)) return; // Focus on Guardian
+        if (!monsterName.equals(TheGuardian.ID)) return;
 
         BaseMod.logger.info("=== GUARDIAN ATTACHMENT SCALING DEBUG ===");
 
@@ -165,7 +210,6 @@ public class AttachmentConfig {
                     BaseMod.logger.info("  RegionAttachment Size: " + ra.getWidth() + "x" + ra.getHeight());
                 }
 
-                // Check if bone has parent scaling
                 Bone parent = bone.getParent();
                 while (parent != null) {
                     BaseMod.logger.info("  Parent '" + parent.getData().getName() + "' Scale: ("
