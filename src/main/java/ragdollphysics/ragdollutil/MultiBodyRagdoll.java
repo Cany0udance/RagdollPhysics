@@ -33,9 +33,19 @@ public class MultiBodyRagdoll {
     private static Texture debugSquareTexture = null;
 
     // Fields for shadow fading
-    private final Slot shadowSlot;
-    private final float initialShadowAlpha;
-    private float shadowFadeTimer = 0f;
+    private static class FadeableSlot {
+        final Slot slot;
+        final float initialAlpha;
+
+        FadeableSlot(Slot slot, float initialAlpha) {
+            this.slot = slot;
+            this.initialAlpha = initialAlpha;
+        }
+    }
+
+    private final List<FadeableSlot> fadeableSlots;
+    private float fadeTimer = 0f;
+    private static final float FADE_DURATION = 0.5f;
     private static final float SHADOW_FADE_DURATION = 0.5f;
     // Add these fields to MultiBodyRagdoll class to track the relationship
     private final float physicsToVisualOffsetX;
@@ -136,36 +146,10 @@ public class MultiBodyRagdoll {
             BaseMod.logger.info("[" + ragdollId + "] Dynamic center correction: " + centerOffset);
         }
 
-        // Rest of constructor remains the same...
-        Slot shadowSlot = skeleton.findSlot("shadow");
-        Bone shadowBone = skeleton.findBone("shadow");
+        this.fadeableSlots = findFadeableSlots(skeleton);
 
-        if (shadowSlot == null && shadowBone != null) {
-            for (Slot slot : skeleton.getSlots()) {
-                if (slot.getBone() == shadowBone) {
-                    shadowSlot = slot;
-                    break;
-                }
-            }
-        }
-
-        if (shadowSlot == null) {
-            for (Slot slot : skeleton.getSlots()) {
-                if (slot.getAttachment() != null) {
-                    String attachmentName = slot.getAttachment().getName().toLowerCase();
-                    if (attachmentName.contains("shadow")) {
-                        shadowSlot = slot;
-                        break;
-                    }
-                }
-            }
-        }
-
-        this.shadowSlot = shadowSlot;
-        if (this.shadowSlot != null) {
-            this.initialShadowAlpha = this.shadowSlot.getColor().a;
-        } else {
-            this.initialShadowAlpha = 0f;
+        if (printInitializationLogs) {
+            BaseMod.logger.info("[" + ragdollId + "] Found " + fadeableSlots.size() + " fadeable slots");
         }
 
         if (printInitializationLogs) {
@@ -298,9 +282,8 @@ public class MultiBodyRagdoll {
         this.initialOffsetX = monster.drawX - startX;
         this.initialOffsetY = monster.drawY - startY;
 
-        // No shadow handling for image-based ragdolls
-        this.shadowSlot = null;
-        this.initialShadowAlpha = 0f;
+// No fadeable parts for image-based ragdolls
+        this.fadeableSlots = new ArrayList<>();
 
         // Log the FIXED relationship for image ragdolls too
         if (printInitializationLogs) {
@@ -310,6 +293,89 @@ public class MultiBodyRagdoll {
             BaseMod.logger.info("[" + ragdollId + "] Fixed offset: (" + physicsToVisualOffsetX + ", " + physicsToVisualOffsetY + ")");
             BaseMod.logger.info("[" + ragdollId + "] Center correction applied: " + centerOffset);
         }
+    }
+
+    // ADD these new helper methods to your MultiBodyRagdoll class:
+
+    private List<FadeableSlot> findFadeableSlots(Skeleton skeleton) {
+        List<FadeableSlot> fadeableSlots = new ArrayList<>();
+
+        // Always check for shadow (existing behavior)
+        Slot shadowSlot = findShadowSlot(skeleton);
+        if (shadowSlot != null) {
+            fadeableSlots.add(new FadeableSlot(shadowSlot, shadowSlot.getColor().a));
+        }
+
+        // Check for monster-specific fadeable parts
+        String[] fadeableParts = FadeablePartsConfig.getFadeableParts(monsterClassName);
+        if (fadeableParts != null) {
+            for (String partName : fadeableParts) {
+                Slot partSlot = findSlotByPartName(skeleton, partName);
+                if (partSlot != null && partSlot != shadowSlot) { // Don't duplicate shadow
+                    fadeableSlots.add(new FadeableSlot(partSlot, partSlot.getColor().a));
+
+                    if (printInitializationLogs) {
+                        BaseMod.logger.info("[" + ragdollId + "] Found fadeable part: "
+                                + partName + " in slot: " + partSlot.getData().getName());
+                    }
+                }
+            }
+        }
+
+        return fadeableSlots;
+    }
+
+    private Slot findShadowSlot(Skeleton skeleton) {
+        Slot shadowSlot = skeleton.findSlot("shadow");
+        Bone shadowBone = skeleton.findBone("shadow");
+
+        if (shadowSlot == null && shadowBone != null) {
+            for (Slot slot : skeleton.getSlots()) {
+                if (slot.getBone() == shadowBone) {
+                    shadowSlot = slot;
+                    break;
+                }
+            }
+        }
+
+        if (shadowSlot == null) {
+            for (Slot slot : skeleton.getSlots()) {
+                if (slot.getAttachment() != null) {
+                    String attachmentName = slot.getAttachment().getName().toLowerCase();
+                    if (attachmentName.contains("shadow")) {
+                        shadowSlot = slot;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return shadowSlot;
+    }
+
+    private Slot findSlotByPartName(Skeleton skeleton, String partName) {
+        // First try to find slot by name
+        Slot slot = skeleton.findSlot(partName);
+        if (slot != null) return slot;
+
+        // Then try to find by attachment name
+        for (Slot s : skeleton.getSlots()) {
+            if (s.getAttachment() != null) {
+                String attachmentName = s.getAttachment().getName().toLowerCase();
+                if (attachmentName.contains(partName.toLowerCase())) {
+                    return s;
+                }
+            }
+        }
+
+        // Finally try slot name contains
+        for (Slot s : skeleton.getSlots()) {
+            if (s.getData().getName().toLowerCase().contains(partName.toLowerCase())) {
+                return s;
+            }
+        }
+
+        return null;
     }
 
     public boolean isProperlyInitialized() {
@@ -341,9 +407,8 @@ public class MultiBodyRagdoll {
     public void update(float deltaTime) {
         updateCount++;
 
-        // Update the shadow fade timer
-        if (shadowSlot != null && shadowFadeTimer < SHADOW_FADE_DURATION) {
-            shadowFadeTimer += deltaTime;
+        if (!fadeableSlots.isEmpty() && fadeTimer < FADE_DURATION) {
+            fadeTimer += deltaTime;
         }
 
         if (canLog()) {
@@ -576,10 +641,9 @@ public class MultiBodyRagdoll {
             }
         }
 
-        // Apply fade out to shadow
-        if (shadowSlot != null) {
-            float fadeProgress = Math.min(1f, shadowFadeTimer / SHADOW_FADE_DURATION);
-            shadowSlot.getColor().a = initialShadowAlpha * (1f - fadeProgress);
+        for (FadeableSlot fadeableSlot : fadeableSlots) {
+            float fadeProgress = Math.min(1f, fadeTimer / FADE_DURATION);
+            fadeableSlot.slot.getColor().a = fadeableSlot.initialAlpha * (1f - fadeProgress);
         }
 
         int hiddenAttachments = 0;
