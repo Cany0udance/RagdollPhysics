@@ -6,7 +6,7 @@ import com.esotericsoftware.spine.Skeleton;
 import com.esotericsoftware.spine.Slot;
 import com.esotericsoftware.spine.attachments.RegionAttachment;
 import com.megacrit.cardcrawl.monsters.beyond.*;
-import com.megacrit.cardcrawl.monsters.city.Byrd;
+import com.megacrit.cardcrawl.monsters.city.*;
 import com.megacrit.cardcrawl.monsters.exordium.*;
 
 import java.util.HashMap;
@@ -68,6 +68,61 @@ public class AttachmentConfig {
                         "nose"
                 });
 
+        MONSTER_ATTACHMENTS.put(JawWorm.ID,
+                new String[] {
+                        "jaw"
+                });
+
+        MONSTER_ATTACHMENTS.put(Looter.ID,
+                new String[] {
+                        "bandana",
+                        "pouch"
+                });
+
+        MONSTER_ATTACHMENTS.put(Mugger.ID,
+                new String[] {
+                        "goggles",
+                        "pouch"
+                });
+
+
+        MONSTER_ATTACHMENTS.put(BanditLeader.ID,
+                new String[] {
+                        "mask"
+                });
+
+        MONSTER_ATTACHMENTS.put(SphericGuardian.ID,
+                new String[] {
+                        "orb (left)",
+                        "orb (right)",
+                        "orb (back)"
+                });
+
+        MONSTER_ATTACHMENTS.put(ShelledParasite.ID,
+                new String[] {
+                        "leftLeg",
+                        "tentacleHorn1",
+                        "tentacleHorn2",
+                        "tentacleHorn3",
+                        "tentacleHorn4",
+                        "rightLeg",
+                        "lowerBody"
+                });
+
+        MONSTER_ATTACHMENTS.put(SnakePlant.ID,
+                new String[] {
+                        "t1",
+                        "t2",
+                        "t3",
+                        "leafCenter",
+                        "leafFront",
+                        "leafLeftFront",
+                        "leafLeftBack",
+                        "leafRightFront",
+                        "leafRightBack",
+                        "leafRightBack2"
+                });
+
         MONSTER_ATTACHMENTS.put(TheGuardian.ID,
                 new String[] {
                         "b2", "b3", "b4", "b5", "b6", "b7", "b8",
@@ -93,6 +148,8 @@ public class AttachmentConfig {
         MONSTER_CHILD_ATTACHMENTS.put(GremlinWarrior.ID + ":legleft", new String[] {"footleft"});
         MONSTER_CHILD_ATTACHMENTS.put(GremlinWarrior.ID + ":legright", new String[] {"footright"});
         MONSTER_CHILD_ATTACHMENTS.put(GremlinWizard.ID + ":head", new String[] {"eyes", "eyelids", "horns"});
+        MONSTER_CHILD_ATTACHMENTS.put(BanditBear.ID + ":mask", new String[] {"right_eye", "left_eye"});
+        MONSTER_CHILD_ATTACHMENTS.put(ShelledParasite.ID + ":lowerBody", new String[] {"mouth"});
 
         // Configure parts that have a CHANCE to detach based on overkill
         DISMEMBERABLE_PARTS.put(Cultist.ID, new String[] {"head"});
@@ -100,6 +157,8 @@ public class AttachmentConfig {
         DISMEMBERABLE_PARTS.put(GremlinWarrior.ID, new String[] {"legleft", "legright"});
         DISMEMBERABLE_PARTS.put(GremlinWizard.ID, new String[] {"head"});
         DISMEMBERABLE_PARTS.put(Byrd.ID, new String[] {"wingback", "wingfront", "wingleft", "wingright"});
+        DISMEMBERABLE_PARTS.put(BanditPointy.ID, new String[] {"head"});
+        DISMEMBERABLE_PARTS.put(BanditBear.ID, new String[] {"mask"});
 
         if (printMatchingLogs) {
             BaseMod.logger.info("STATIC CONFIG DEBUG: OrbWalker attachments = "

@@ -85,6 +85,8 @@ public class MultiBodyRagdoll {
         FREE_ROTATION_ENEMIES.add(AcidSlime_S.ID);
         FREE_ROTATION_ENEMIES.add(SpikeSlime_S.ID);
         FREE_ROTATION_ENEMIES.add(BronzeOrb.ID);
+        FREE_ROTATION_ENEMIES.add(AcidSlime_M.ID);
+        FREE_ROTATION_ENEMIES.add(SpikeSlime_M.ID);
     }
 
     // Helper class to store slot data for second pass

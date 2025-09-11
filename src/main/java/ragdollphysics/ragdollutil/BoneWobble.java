@@ -3,10 +3,7 @@ import basemod.BaseMod;
 import com.esotericsoftware.spine.Bone;
 import com.esotericsoftware.spine.Slot;
 import com.megacrit.cardcrawl.monsters.city.BronzeOrb;
-import com.megacrit.cardcrawl.monsters.exordium.AcidSlime_S;
-import com.megacrit.cardcrawl.monsters.exordium.LouseDefensive;
-import com.megacrit.cardcrawl.monsters.exordium.LouseNormal;
-import com.megacrit.cardcrawl.monsters.exordium.SpikeSlime_S;
+import com.megacrit.cardcrawl.monsters.exordium.*;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -54,6 +51,8 @@ public class BoneWobble {
         FREE_ROTATION_ENEMIES.add(AcidSlime_S.ID);
         FREE_ROTATION_ENEMIES.add(SpikeSlime_S.ID);
         FREE_ROTATION_ENEMIES.add(BronzeOrb.ID);
+        FREE_ROTATION_ENEMIES.add(AcidSlime_M.ID);
+        FREE_ROTATION_ENEMIES.add(SpikeSlime_M.ID);
     }
 
     public BoneWobble(float initialRotation, Bone bone) {

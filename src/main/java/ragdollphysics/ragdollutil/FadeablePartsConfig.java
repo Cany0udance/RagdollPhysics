@@ -1,6 +1,7 @@
 package ragdollphysics.ragdollutil;
 
 import com.megacrit.cardcrawl.monsters.beyond.SnakeDagger;
+import com.megacrit.cardcrawl.monsters.city.SnakePlant;
 
 import java.util.HashMap;
 
@@ -15,6 +16,7 @@ public class FadeablePartsConfig {
     static {
         // Define which parts fade for each enemy
         FADEABLE_PARTS.put(SnakeDagger.ID, new String[]{"glow"});
+        FADEABLE_PARTS.put(SnakePlant.ID, new String[]{"leafShadow"});
         // Add more enemies as needed
     }
 
