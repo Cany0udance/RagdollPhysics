@@ -166,12 +166,12 @@ public class MultiBodyRagdoll {
 
         int attachmentCount = 0;
 // Get overkill damage for dismemberment calculations
+// Get overkill damage for dismemberment calculations
         float overkillDamage = OverkillTracker.getOverkillDamage(monster);
 
 // Track created attachments for parent-child linking
         HashMap<String, AttachmentPhysics> parentAttachments = new HashMap<>();
         List<SlotAttachmentData> potentialChildren = new ArrayList<>();
-
 
 // FIRST PASS: Create parent attachments only
         for (Slot slot : skeleton.getSlots()) {
@@ -182,10 +182,52 @@ public class MultiBodyRagdoll {
                 boolean shouldDetach = AttachmentConfig.shouldDetachAttachment(monsterClassName, attachmentName, overkillDamage);
 
                 if (shouldDetach) {
-                    // Create parent attachment (no parent parameter)
+                    // Calculate proper attachment position based on type
+                    float attachmentX, attachmentY;
+
+                    if (slot.getAttachment() instanceof RegionAttachment) {
+                        RegionAttachment regionAttachment = (RegionAttachment) slot.getAttachment();
+                        attachmentX = startX + (bone.getWorldX() + regionAttachment.getX()) * Settings.scale;
+                        attachmentY = startY + (bone.getWorldY() + regionAttachment.getY()) * Settings.scale;
+                    } else if (slot.getAttachment() instanceof MeshAttachment) {
+                        MeshAttachment meshAttachment = (MeshAttachment) slot.getAttachment();
+
+                        // Get the actual world vertices of the mesh
+                        float[] worldVertices = meshAttachment.updateWorldVertices(slot, false);
+
+                        // Calculate center point from the vertices
+                        float centerX = 0f;
+                        float centerY = 0f;
+                        int vertexCount = 0;
+
+                        for (int i = 0; i < worldVertices.length; i += 5) {
+                            centerX += worldVertices[i];     // x coordinate
+                            centerY += worldVertices[i + 1]; // y coordinate
+                            vertexCount++;
+                        }
+
+                        if (vertexCount > 0) {
+                            centerX /= vertexCount;
+                            centerY /= vertexCount;
+                        }
+
+                        attachmentX = centerX;
+                        attachmentY = centerY;
+
+                        if (printInitializationLogs) {
+                            BaseMod.logger.info("[" + ragdollId + "] MeshAttachment '" + attachmentName
+                                    + "' center calculated from " + vertexCount + " vertices: ("
+                                    + String.format("%.1f", attachmentX) + ", " + String.format("%.1f", attachmentY) + ")");
+                        }
+                    } else {
+                        // Fallback for other attachment types
+                        attachmentX = startX + bone.getWorldX() * Settings.scale;
+                        attachmentY = startY + bone.getWorldY() * Settings.scale;
+                    }
+
+                    // Create parent attachment with calculated position
                     AttachmentPhysics parentAttachment = new AttachmentPhysics(
-                            startX + bone.getWorldX() * Settings.scale,
-                            startY + bone.getWorldY() * Settings.scale,
+                            attachmentX, attachmentY,
                             groundLevel, bone, slot.getAttachment(), attachmentName);
 
                     parentAttachments.put(attachmentName.toLowerCase(), parentAttachment);
@@ -214,10 +256,52 @@ public class MultiBodyRagdoll {
             AttachmentPhysics parentAttachment = findParentForChild(monsterClassName, attachmentName, parentAttachments);
 
             if (parentAttachment != null) {
-                // Create child attachment linked to parent
+                // Calculate proper attachment position based on type for child attachments too
+                float attachmentX, attachmentY;
+
+                if (data.slot.getAttachment() instanceof RegionAttachment) {
+                    RegionAttachment regionAttachment = (RegionAttachment) data.slot.getAttachment();
+                    attachmentX = startX + (data.bone.getWorldX() + regionAttachment.getX()) * Settings.scale;
+                    attachmentY = startY + (data.bone.getWorldY() + regionAttachment.getY()) * Settings.scale;
+                } else if (data.slot.getAttachment() instanceof MeshAttachment) {
+                    MeshAttachment meshAttachment = (MeshAttachment) data.slot.getAttachment();
+
+                    // Get the actual world vertices of the mesh
+                    float[] worldVertices = meshAttachment.updateWorldVertices(data.slot, false);
+
+                    // Calculate center point from the vertices
+                    float centerX = 0f;
+                    float centerY = 0f;
+                    int vertexCount = 0;
+
+                    for (int i = 0; i < worldVertices.length; i += 5) {
+                        centerX += worldVertices[i];     // x coordinate
+                        centerY += worldVertices[i + 1]; // y coordinate
+                        vertexCount++;
+                    }
+
+                    if (vertexCount > 0) {
+                        centerX /= vertexCount;
+                        centerY /= vertexCount;
+                    }
+
+                    attachmentX = centerX;
+                    attachmentY = centerY;
+
+                    if (printInitializationLogs) {
+                        BaseMod.logger.info("[" + ragdollId + "] Child MeshAttachment '" + attachmentName
+                                + "' center calculated from " + vertexCount + " vertices: ("
+                                + String.format("%.1f", attachmentX) + ", " + String.format("%.1f", attachmentY) + ")");
+                    }
+                } else {
+                    // Fallback for other attachment types
+                    attachmentX = startX + data.bone.getWorldX() * Settings.scale;
+                    attachmentY = startY + data.bone.getWorldY() * Settings.scale;
+                }
+
+                // Create child attachment linked to parent with calculated position
                 AttachmentPhysics childAttachment = new AttachmentPhysics(
-                        startX + data.bone.getWorldX() * Settings.scale,
-                        startY + data.bone.getWorldY() * Settings.scale,
+                        attachmentX, attachmentY,
                         groundLevel, data.bone, data.slot.getAttachment(), attachmentName,
                         parentAttachment); // Link to parent
 
