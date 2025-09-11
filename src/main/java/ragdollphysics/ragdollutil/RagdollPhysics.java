@@ -2,6 +2,11 @@ package ragdollphysics.ragdollutil;
 
 import basemod.BaseMod;
 import com.badlogic.gdx.math.MathUtils;
+import com.megacrit.cardcrawl.monsters.AbstractMonster;
+import com.megacrit.cardcrawl.monsters.city.BronzeOrb;
+
+import java.util.HashSet;
+import java.util.Set;
 
 import static ragdollphysics.RagdollPhysics.enableZeroGravity;
 
@@ -14,6 +19,7 @@ public class RagdollPhysics {
     private final float groundY;
     private final String physicsId;
     private int updateCount = 0;
+    private final boolean hasZeroGravity; // More generic name
 
     // Physics constants
     private static final float SIMPLE_BOUNCE_THRESHOLD = 200f;
@@ -21,6 +27,15 @@ public class RagdollPhysics {
     private static final float RIGHT_WALL_X = 1850f;
     private static final float LEFT_WALL_X = 0f;
     private static final float CEILING_Y = 1100f;
+
+    // Zero gravity enemy configuration - add new enemies here
+    private static final Set<String> ZERO_GRAVITY_ENEMIES = new HashSet<>();
+    static {
+        ZERO_GRAVITY_ENEMIES.add(BronzeOrb.ID);
+        // Add more enemies here as needed:
+        // ZERO_GRAVITY_ENEMIES.add(SomeFloatingEnemy.ID);
+        // ZERO_GRAVITY_ENEMIES.add(AnotherFlyingEnemy.ID);
+    }
 
     // Rotation tracking for limiting
     public float totalRotationDegrees = 0f;
@@ -37,16 +52,59 @@ public class RagdollPhysics {
         this.physicsId = "Physics_" + System.currentTimeMillis() % 10000;
         this.lastRotation = 0f;
         this.totalRotationDegrees = 0f;
+        this.hasZeroGravity = false; // Default constructor doesn't know about monster type
+    }
+
+    // Constructor that accepts monster information for gravity determination
+    public RagdollPhysics(float startX, float startY, float forceX, float forceY, float groundLevel, AbstractMonster monster) {
+        this.x = startX;
+        this.y = startY;
+        this.velocityX = forceX;
+        this.velocityY = forceY;
+        this.groundY = groundLevel;
+        this.rotation = 0f;
+        this.angularVelocity = MathUtils.random(-144f, 144f);
+        this.physicsId = "Physics_" + System.currentTimeMillis() % 10000;
+        this.lastRotation = 0f;
+        this.totalRotationDegrees = 0f;
+        this.hasZeroGravity = ZERO_GRAVITY_ENEMIES.contains(monster.id);
+    }
+
+    // Alternative constructor that accepts monster class name directly
+    public RagdollPhysics(float startX, float startY, float forceX, float forceY, float groundLevel, String monsterClassName) {
+        this.x = startX;
+        this.y = startY;
+        this.velocityX = forceX;
+        this.velocityY = forceY;
+        this.groundY = groundLevel;
+        this.rotation = 0f;
+        this.angularVelocity = MathUtils.random(-144f, 144f);
+        this.physicsId = "Physics_" + System.currentTimeMillis() % 10000;
+        this.lastRotation = 0f;
+        this.totalRotationDegrees = 0f;
+        this.hasZeroGravity = ZERO_GRAVITY_ENEMIES.contains(monsterClassName);
+    }
+
+    // Static method to check if an enemy should have zero gravity
+    public static boolean shouldHaveZeroGravity(String monsterClassName) {
+        return ZERO_GRAVITY_ENEMIES.contains(monsterClassName);
+    }
+
+    // Static method to add zero gravity enemies at runtime (if needed)
+    public static void addZeroGravityEnemy(String monsterClassName) {
+        ZERO_GRAVITY_ENEMIES.add(monsterClassName);
     }
 
     public void update(float deltaTime, MultiBodyRagdoll parent) {
         updateCount++;
 
-        if (enableZeroGravity) {
+        // Apply gravity unless global zero gravity is enabled OR this enemy has inherent zero gravity
+        if (enableZeroGravity || hasZeroGravity) {
             velocityY += 0f * deltaTime;
         } else {
             velocityY += GRAVITY * deltaTime;
         }
+
         x += velocityX * deltaTime;
         y += velocityY * deltaTime;
         rotation += angularVelocity * deltaTime;
@@ -54,15 +112,13 @@ public class RagdollPhysics {
         float preUpdateVelocityY = velocityY;
         boolean hasContactedGround = y <= groundY + 5f;
 
-// Only apply airborne rotation enhancement while actually airborne
+        // Only apply airborne rotation enhancement while actually airborne
         if (!hasContactedGround && preUpdateVelocityY > 200f) {
             float airborneIntensity = Math.min(preUpdateVelocityY / 600f, 1.0f);
             // Time-based airborne enhancement
             float airborneBoost = 1.0f + (airborneIntensity * 0.02f * deltaTime * 60f);
             angularVelocity *= airborneBoost;
         }
-
-
 
         // Wall collision handling
         if (x > RIGHT_WALL_X && velocityX > 0) {
@@ -77,7 +133,6 @@ public class RagdollPhysics {
             handleCeilingCollision();
         }
 
-        // Ground collision handling
         if (y <= groundY && velocityY <= 0) {
             y = groundY;
             if (Math.abs(velocityY) > SIMPLE_BOUNCE_THRESHOLD) {
@@ -156,5 +211,10 @@ public class RagdollPhysics {
         boolean isLowMomentum = totalMomentum < 25f;
         boolean isNearGround = y <= groundY + 10f;
         return isLowMomentum && isNearGround;
+    }
+
+    // Getter for zero gravity status
+    public boolean hasZeroGravity() {
+        return hasZeroGravity;
     }
 }

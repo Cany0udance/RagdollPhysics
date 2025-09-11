@@ -8,8 +8,12 @@ import com.esotericsoftware.spine.SkeletonRenderer;
 import com.esotericsoftware.spine.Slot;
 import com.esotericsoftware.spine.attachments.RegionAttachment;
 import com.megacrit.cardcrawl.core.Settings;
+import com.megacrit.cardcrawl.dungeons.AbstractDungeon;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
+import com.megacrit.cardcrawl.monsters.beyond.SnakeDagger;
 import com.megacrit.cardcrawl.monsters.beyond.TimeEater;
+import com.megacrit.cardcrawl.monsters.city.BronzeOrb;
+import com.megacrit.cardcrawl.monsters.city.Byrd;
 import com.megacrit.cardcrawl.monsters.exordium.*;
 
 /**
@@ -47,6 +51,12 @@ public class RagdollFactory {
                 return baseGroundLevel + (100f * Settings.scale);
             case Cultist.ID:
                 return baseGroundLevel + (20f * Settings.scale);
+            case Byrd.ID:
+                return AbstractDungeon.player.drawY + (20f * Settings.scale);
+            case BronzeOrb.ID:
+                return AbstractDungeon.player.drawY + (20f * Settings.scale);
+            case SnakeDagger.ID:
+                return AbstractDungeon.player.drawY + (20f * Settings.scale);
             default:
                 return baseGroundLevel + (20f * Settings.scale);
         }

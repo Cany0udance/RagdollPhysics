@@ -15,11 +15,10 @@ import com.esotericsoftware.spine.attachments.RegionAttachment;
 import com.megacrit.cardcrawl.core.Settings;
 import com.megacrit.cardcrawl.helpers.ImageMaster;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
-import com.megacrit.cardcrawl.monsters.exordium.Sentry;
-import com.megacrit.cardcrawl.monsters.exordium.SlaverBlue;
+import com.megacrit.cardcrawl.monsters.city.BronzeOrb;
+import com.megacrit.cardcrawl.monsters.exordium.*;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Main ragdoll physics system that coordinates multiple physics bodies.
@@ -64,9 +63,32 @@ public class MultiBodyRagdoll {
     private static boolean printFieldLogs = false; // Set to true to enable field discovery logs
     public static boolean printInitializationLogs = false; // Set to true to enable detailed initialization logs
     private static boolean printUpdateLogs = false; // Set to true to enable regular update logs
+    private final boolean allowsFreeRotation;
 
     // Flag to indicate if this is an image-based ragdoll
     private final boolean isImageBased;
+
+    private static final Set<String> FREE_ROTATION_ENEMIES = new HashSet<>();
+    static {
+        FREE_ROTATION_ENEMIES.add(LouseNormal.ID);
+        FREE_ROTATION_ENEMIES.add(LouseDefensive.ID);
+        FREE_ROTATION_ENEMIES.add(AcidSlime_S.ID);
+        FREE_ROTATION_ENEMIES.add(SpikeSlime_S.ID);
+        FREE_ROTATION_ENEMIES.add(BronzeOrb.ID);
+    }
+
+    // Helper class to store slot data for second pass
+    class SlotAttachmentData {
+        final Slot slot;
+        final String attachmentName;
+        final Bone bone;
+
+        SlotAttachmentData(Slot slot, String attachmentName, Bone bone) {
+            this.slot = slot;
+            this.attachmentName = attachmentName;
+            this.bone = bone;
+        }
+    }
 
     public MultiBodyRagdoll(Skeleton skeleton, float groundLevel, float startX, float startY,
                             String monsterClassName, AbstractMonster monster) {
@@ -75,6 +97,7 @@ public class MultiBodyRagdoll {
         this.associatedMonster = monster;
         this.attachmentBodies = new HashMap<>();
         this.groundY = groundLevel;
+        this.allowsFreeRotation = FREE_ROTATION_ENEMIES.contains(monsterClassName);
 
         // DYNAMIC CENTER OF MASS CALCULATION based on actual body bone
         CenterOfMassConfig.CenterOffset centerOffset = CenterOfMassConfig.calculateCenterOffset(skeleton, monsterClassName);
@@ -83,7 +106,7 @@ public class MultiBodyRagdoll {
         float correctedStartX = startX + centerOffset.x;
         float correctedStartY = startY + centerOffset.y;
 
-        this.mainBody = new RagdollPhysics(correctedStartX, correctedStartY, 0, 0, groundLevel);
+        this.mainBody = new RagdollPhysics(correctedStartX, correctedStartY, 0, 0, groundLevel, monsterClassName);
 
         // CRITICAL: Calculate the FIXED relationship between physics center and visual center
         // This relationship should NEVER change during the simulation
@@ -159,31 +182,75 @@ public class MultiBodyRagdoll {
 // Get overkill damage for dismemberment calculations
         float overkillDamage = OverkillTracker.getOverkillDamage(monster);
 
-// Handle attachments - use ORIGINAL startX/Y for bone positioning
+// Track created attachments for parent-child linking
+        HashMap<String, AttachmentPhysics> parentAttachments = new HashMap<>();
+        List<SlotAttachmentData> potentialChildren = new ArrayList<>();
+
+
+// FIRST PASS: Create parent attachments only
         for (Slot slot : skeleton.getSlots()) {
             if (slot.getAttachment() != null) {
                 String attachmentName = slot.getAttachment().getName();
                 Bone bone = slot.getBone();
 
-                // Use the updated method that includes dismemberment logic
                 boolean shouldDetach = AttachmentConfig.shouldDetachAttachment(monsterClassName, attachmentName, overkillDamage);
 
                 if (shouldDetach) {
-                    attachmentBodies.put(attachmentName,
-                            new AttachmentPhysics(
-                                    startX + bone.getWorldX() * Settings.scale,
-                                    startY + bone.getWorldY() * Settings.scale, groundLevel,
-                                    bone, slot.getAttachment(), attachmentName));
+                    // Create parent attachment (no parent parameter)
+                    AttachmentPhysics parentAttachment = new AttachmentPhysics(
+                            startX + bone.getWorldX() * Settings.scale,
+                            startY + bone.getWorldY() * Settings.scale,
+                            groundLevel, bone, slot.getAttachment(), attachmentName);
+
+                    parentAttachments.put(attachmentName.toLowerCase(), parentAttachment);
+                    attachmentBodies.put(attachmentName, parentAttachment);
                     attachmentCount++;
+
                     if (printInitializationLogs) {
                         String attachmentType = slot.getAttachment().getClass().getSimpleName();
-                        BaseMod.logger.info("[" + ragdollId + "] Found detachable "
-                                + attachmentType + ": '" + attachmentName
-                                + "' on bone: " + bone.getData().getName()
+                        BaseMod.logger.info("[" + ragdollId + "] Created PARENT " + attachmentType
+                                + ": '" + attachmentName + "' on bone: " + bone.getData().getName()
                                 + " (overkill: " + String.format("%.1f", overkillDamage) + ")");
                     }
+                } else {
+                    // Store for potential child processing
+                    potentialChildren.add(new SlotAttachmentData(slot, attachmentName, bone));
                 }
             }
+        }
+
+// SECOND PASS: Process potential child attachments for this specific monster
+        int childrenCreated = 0;
+        for (SlotAttachmentData data : potentialChildren) {
+            String attachmentName = data.attachmentName;
+
+            // Find potential parent for this attachment using monster-specific rules
+            AttachmentPhysics parentAttachment = findParentForChild(monsterClassName, attachmentName, parentAttachments);
+
+            if (parentAttachment != null) {
+                // Create child attachment linked to parent
+                AttachmentPhysics childAttachment = new AttachmentPhysics(
+                        startX + data.bone.getWorldX() * Settings.scale,
+                        startY + data.bone.getWorldY() * Settings.scale,
+                        groundLevel, data.bone, data.slot.getAttachment(), attachmentName,
+                        parentAttachment); // Link to parent
+
+                attachmentBodies.put(attachmentName, childAttachment);
+                attachmentCount++;
+                childrenCreated++;
+
+                if (printInitializationLogs) {
+                    String attachmentType = data.slot.getAttachment().getClass().getSimpleName();
+                    BaseMod.logger.info("[" + ragdollId + "] Created CHILD " + attachmentType
+                            + ": '" + attachmentName + "' linked to '" + parentAttachment.getAttachmentName()
+                            + "' for monster " + monsterClassName);
+                }
+            }
+        }
+
+        if (printInitializationLogs && childrenCreated > 0) {
+            BaseMod.logger.info("[" + ragdollId + "] Parent-child creation complete for " + monsterClassName
+                    + " - Parents: " + parentAttachments.size() + ", Children: " + childrenCreated);
         }
 
         if (printInitializationLogs) {
@@ -197,6 +264,8 @@ public class MultiBodyRagdoll {
     }
 
 
+
+
     // Constructor for image-based ragdolls (like Hexaghost)
     public MultiBodyRagdoll(float startX, float startY, float groundLevel,
                             String monsterClassName, AbstractMonster monster) {
@@ -205,6 +274,8 @@ public class MultiBodyRagdoll {
         this.associatedMonster = monster;
         this.attachmentBodies = new HashMap<>(); // Empty for image ragdolls
         this.groundY = groundLevel;
+        this.allowsFreeRotation = FREE_ROTATION_ENEMIES.contains(monsterClassName);
+
 
         // GET CENTER OF MASS CORRECTION for image-based ragdolls too
         CenterOfMassConfig.CenterOffset centerOffset = CenterOfMassConfig.calculateCenterOffset(null, monsterClassName);
@@ -213,7 +284,7 @@ public class MultiBodyRagdoll {
         float correctedStartX = startX + centerOffset.x;
         float correctedStartY = startY + centerOffset.y;
 
-        this.mainBody = new RagdollPhysics(correctedStartX, correctedStartY, 0, 0, groundLevel);
+        this.mainBody = new RagdollPhysics(correctedStartX, correctedStartY, 0, 0, groundLevel, monsterClassName);
 
         // CRITICAL: Calculate the FIXED relationship between physics center and visual center
         this.physicsToVisualOffsetX = (monster.drawX - correctedStartX);
@@ -358,6 +429,27 @@ public class MultiBodyRagdoll {
                     + String.format("%.1f", physicsToVisualOffsetY) + ")");
             lastLogTime = System.currentTimeMillis();
         }
+    }
+
+    // Helper method to find parent attachment for a potential child (monster-specific)
+    private AttachmentPhysics findParentForChild(String monsterName, String childName,
+                                                 HashMap<String, AttachmentPhysics> parentAttachments) {
+
+        // Check each parent attachment to see if this child should belong to it
+        for (Map.Entry<String, AttachmentPhysics> entry : parentAttachments.entrySet()) {
+            String parentName = entry.getValue().getAttachmentName();
+
+            // Use monster-specific child attachment checking
+            if (AttachmentConfig.isChildAttachment(monsterName, parentName, childName)) {
+                if (printInitializationLogs) {
+                    BaseMod.logger.info("[" + ragdollId + "] Found parent '" + parentName
+                            + "' for child '" + childName + "' in monster " + monsterName);
+                }
+                return entry.getValue();
+            }
+        }
+
+        return null;
     }
 
     public boolean hasSettledOnGround() {
@@ -543,23 +635,22 @@ public class MultiBodyRagdoll {
     // Updated helper method to find body bone (same logic as in CenterOfMassConfig)
     private Bone findBodyBone(Skeleton skeleton) {
         if (skeleton == null) return null;
-
         // Use the same logic as CenterOfMassConfig for consistency
-        String customBodyAttachment = CenterOfMassConfig.customBodyAttachments.get(monsterClassName);
-        if (customBodyAttachment != null) {
-            // First try to find bone by attachment name
-            Bone boneFromAttachment = findBoneByAttachmentName(skeleton, customBodyAttachment);
-            if (boneFromAttachment != null) {
-                return boneFromAttachment;
-            }
-
-            // Fallback: try the attachment name as a direct bone name
-            Bone directBone = skeleton.findBone(customBodyAttachment);
-            if (directBone != null) {
-                return directBone;
+        String[] customBodyAttachments = CenterOfMassConfig.customBodyAttachments.get(monsterClassName);
+        if (customBodyAttachments != null) {
+            for (String attachmentName : customBodyAttachments) {
+                // First try to find bone by attachment name
+                Bone boneFromAttachment = findBoneByAttachmentName(skeleton, attachmentName);
+                if (boneFromAttachment != null) {
+                    return boneFromAttachment;
+                }
+                // Fallback: try the attachment name as a direct bone name
+                Bone directBone = skeleton.findBone(attachmentName);
+                if (directBone != null) {
+                    return directBone;
+                }
             }
         }
-
         // Fallback to generic names
         String[] bodyBoneNames = {"body", "torso", "chest", "spine", "hip", "pelvis", "trunk"};
         for (String boneName : bodyBoneNames) {
@@ -568,7 +659,6 @@ public class MultiBodyRagdoll {
                 return bone;
             }
         }
-
         return null;
     }
 
@@ -758,5 +848,12 @@ public class MultiBodyRagdoll {
     public boolean isImageBased() { return isImageBased; }
     public String getRagdollId() { return ragdollId; }
     public int getUpdateCount() { return updateCount; }
+    public boolean getAllowsFreeRotation() {
+        return allowsFreeRotation;
+    }
+
+    public String getMonsterClassName() {
+        return monsterClassName;
+    }
 
 }

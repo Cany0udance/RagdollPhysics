@@ -2,6 +2,14 @@ package ragdollphysics.ragdollutil;
 import basemod.BaseMod;
 import com.esotericsoftware.spine.Bone;
 import com.esotericsoftware.spine.Slot;
+import com.megacrit.cardcrawl.monsters.city.BronzeOrb;
+import com.megacrit.cardcrawl.monsters.exordium.AcidSlime_S;
+import com.megacrit.cardcrawl.monsters.exordium.LouseDefensive;
+import com.megacrit.cardcrawl.monsters.exordium.LouseNormal;
+import com.megacrit.cardcrawl.monsters.exordium.SpikeSlime_S;
+
+import java.util.HashSet;
+import java.util.Set;
 
 import static ragdollphysics.ragdollutil.MultiBodyRagdoll.printInitializationLogs;
 
@@ -39,6 +47,15 @@ public class BoneWobble {
     private float lastSignificantMovement = 0f;
     private boolean hasLoggedLocking = false;
 
+    private static final Set<String> FREE_ROTATION_ENEMIES = new HashSet<>();
+    static {
+        FREE_ROTATION_ENEMIES.add(LouseNormal.ID);
+        FREE_ROTATION_ENEMIES.add(LouseDefensive.ID);
+        FREE_ROTATION_ENEMIES.add(AcidSlime_S.ID);
+        FREE_ROTATION_ENEMIES.add(SpikeSlime_S.ID);
+        FREE_ROTATION_ENEMIES.add(BronzeOrb.ID);
+    }
+
     public BoneWobble(float initialRotation, Bone bone) {
         this.originalRotation = initialRotation;
         this.bone = bone;
@@ -64,6 +81,25 @@ public class BoneWobble {
 
         this.isLimb = hasVisualAttachment && isAnatomicalLimbName(boneName);
         this.isLongLimb = this.isLimb;
+    }
+
+    private boolean shouldAllowFreeRotation(MultiBodyRagdoll ragdoll) {
+        String monsterClassName = ragdoll.getMonsterClassName();
+        String boneName = bone.getData().getName().toLowerCase();
+
+        // Check if this is a free rotation enemy
+        if (!FREE_ROTATION_ENEMIES.contains(monsterClassName)) {
+            return false; // Not a free rotation enemy, use normal constraints
+        }
+
+        // For Louse enemies specifically, constrain antler bones
+        if ((monsterClassName.equals(LouseNormal.ID) || monsterClassName.equals(LouseDefensive.ID))
+                && boneName.contains("ant")) {
+            return false; // Constrain antlers on Louse
+        }
+
+        // Other bones on free rotation enemies get free rotation
+        return true;
     }
 
     // Calculate how deep this bone is in its chain
@@ -152,7 +188,7 @@ public class BoneWobble {
         rotation += angularVelocity * deltaTime;
 
         // Apply hierarchical constraints - only during airborne and initial ground contact, not during settling
-        if (chainDepth > 0 && hasContactedGround && isAirborne) {
+        if (chainDepth > 0 && hasContactedGround && isAirborne && !shouldAllowFreeRotation(ragdoll)) {
             applyHierarchicalConstraints(ragdoll, parentHasSettled);
         }
 
@@ -202,7 +238,7 @@ public class BoneWobble {
         }
 
         // Constraint restoration force - only when airborne or moving after ground contact
-        if (constraintViolation > 0.2f && (!hasContactedGround || isAirborne)) {
+        if (constraintViolation > 0.2f && (!hasContactedGround || isAirborne) && !shouldAllowFreeRotation(ragdoll)) {
             float baseStrength = !hasContactedGround ? 3f : 5f;
             float restorationForce = -Math.signum(rotation) * constraintViolation * baseStrength * deltaTime * 60f;
             angularVelocity += restorationForce;

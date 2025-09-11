@@ -5,8 +5,11 @@ import com.esotericsoftware.spine.Bone;
 import com.esotericsoftware.spine.Skeleton;
 import com.esotericsoftware.spine.Slot;
 import com.megacrit.cardcrawl.core.Settings;
+import com.megacrit.cardcrawl.monsters.beyond.Exploder;
+import com.megacrit.cardcrawl.monsters.city.Byrd;
 import com.megacrit.cardcrawl.monsters.exordium.*;
 
+import java.util.Arrays;
 import java.util.HashMap;
 
 public class CenterOfMassConfig {
@@ -14,14 +17,14 @@ public class CenterOfMassConfig {
     private static boolean printCenterOfMassLogs = true; // Set to true to enable logs
 
     // Map of monster class names to their specific body attachment names
-    public static final HashMap<String, String> customBodyAttachments = new HashMap<>();
+    public static final HashMap<String, String[]> customBodyAttachments = new HashMap<>();
     static {
-        // Define custom body attachment names for specific monsters
-        // The system will find the bone associated with these attachments
-        customBodyAttachments.put(Cultist.ID, "body");
-        customBodyAttachments.put(SlaverBlue.ID, "cloakblue");
-        customBodyAttachments.put(LouseNormal.ID, "seg3");
-        customBodyAttachments.put(LouseDefensive.ID, "seg3");
+        customBodyAttachments.put(Cultist.ID, new String[]{"body"});
+        customBodyAttachments.put(SlaverBlue.ID, new String[]{"cloakblue"});
+        customBodyAttachments.put(LouseNormal.ID, new String[]{"seg3"});
+        customBodyAttachments.put(LouseDefensive.ID, new String[]{"seg3"});
+        customBodyAttachments.put(Byrd.ID, new String[]{"flying/torso", "grounded/torso"});
+        customBodyAttachments.put(Exploder.ID, new String[]{"inside"});
     }
 
     // Calculate center of mass offset based on actual skeleton body bone position
@@ -67,31 +70,28 @@ public class CenterOfMassConfig {
     private static Bone findBodyBone(Skeleton skeleton, String monsterClassName) {
         if (skeleton == null) return null;
 
-        // First, try to find bone by attachment name
-        String customBodyAttachment = customBodyAttachments.get(monsterClassName);
-        if (customBodyAttachment != null) {
-            if (printCenterOfMassLogs) {
-                BaseMod.logger.info("[CenterOfMass] Looking for bone associated with attachment: '" + customBodyAttachment + "'");
-            }
-
-            Bone boneFromAttachment = findBoneByAttachmentName(skeleton, customBodyAttachment);
-            if (boneFromAttachment != null) {
+        // Try custom attachments (now supporting multiple)
+        String[] customAttachments = customBodyAttachments.get(monsterClassName); // Fixed variable name
+        if (customAttachments != null) {
+            for (String attachmentName : customAttachments) {
                 if (printCenterOfMassLogs) {
-                    BaseMod.logger.info("[CenterOfMass] Found bone '" + boneFromAttachment.getData().getName()
-                            + "' associated with attachment '" + customBodyAttachment + "' for " + monsterClassName);
-                }
-                return boneFromAttachment;
-            } else {
-                if (printCenterOfMassLogs) {
-                    BaseMod.logger.warn("[CenterOfMass] No bone found for attachment '" + customBodyAttachment
-                            + "' for " + monsterClassName + ", trying direct bone name match");
+                    BaseMod.logger.info("[CenterOfMass] Looking for bone associated with attachment: '" + attachmentName + "'");
                 }
 
-                // Fallback: try the attachment name as a direct bone name
-                Bone directBone = skeleton.findBone(customBodyAttachment);
+                Bone boneFromAttachment = findBoneByAttachmentName(skeleton, attachmentName);
+                if (boneFromAttachment != null) {
+                    if (printCenterOfMassLogs) {
+                        BaseMod.logger.info("[CenterOfMass] Found bone '" + boneFromAttachment.getData().getName()
+                                + "' associated with attachment '" + attachmentName + "' for " + monsterClassName);
+                    }
+                    return boneFromAttachment;
+                }
+
+                // Also try direct bone name fallback for this attachment
+                Bone directBone = skeleton.findBone(attachmentName);
                 if (directBone != null) {
                     if (printCenterOfMassLogs) {
-                        BaseMod.logger.info("[CenterOfMass] Found bone directly named '" + customBodyAttachment + "'");
+                        BaseMod.logger.info("[CenterOfMass] Found bone directly named '" + attachmentName + "'");
                     }
                     return directBone;
                 }
@@ -161,16 +161,16 @@ public class CenterOfMassConfig {
     }
 
     // Updated method to add custom body attachment mapping
-    public static void setCustomBodyAttachment(String monsterClassName, String attachmentName) {
-        customBodyAttachments.put(monsterClassName, attachmentName);
+    public static void setCustomBodyAttachment(String monsterClassName, String... attachmentNames) {
+        customBodyAttachments.put(monsterClassName, attachmentNames);
         if (printCenterOfMassLogs) {
-            BaseMod.logger.info("[CenterOfMass] Set custom body attachment for " + monsterClassName + ": " + attachmentName);
+            BaseMod.logger.info("[CenterOfMass] Set custom body attachments for " + monsterClassName + ": " + Arrays.toString(attachmentNames));
         }
     }
 
     // Public method to get the body attachment name for a monster (for debugging)
-    public static String getBodyAttachmentName(String monsterClassName) {
-        return customBodyAttachments.getOrDefault(monsterClassName, "default search");
+    public static String[] getBodyAttachmentNames(String monsterClassName) {
+        return customBodyAttachments.getOrDefault(monsterClassName, new String[]{"default search"});
     }
 
     public static class CenterOffset {

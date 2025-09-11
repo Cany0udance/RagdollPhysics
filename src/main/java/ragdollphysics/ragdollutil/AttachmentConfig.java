@@ -5,23 +5,23 @@ import com.esotericsoftware.spine.Bone;
 import com.esotericsoftware.spine.Skeleton;
 import com.esotericsoftware.spine.Slot;
 import com.esotericsoftware.spine.attachments.RegionAttachment;
-import com.megacrit.cardcrawl.monsters.beyond.OrbWalker;
-import com.megacrit.cardcrawl.monsters.beyond.Repulsor;
-import com.megacrit.cardcrawl.monsters.beyond.TimeEater;
-import com.megacrit.cardcrawl.monsters.exordium.Cultist;
-import com.megacrit.cardcrawl.monsters.exordium.Sentry;
-import com.megacrit.cardcrawl.monsters.exordium.SlaverRed;
-import com.megacrit.cardcrawl.monsters.exordium.TheGuardian;
+import com.megacrit.cardcrawl.monsters.beyond.*;
+import com.megacrit.cardcrawl.monsters.city.Byrd;
+import com.megacrit.cardcrawl.monsters.exordium.*;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 
 public class AttachmentConfig {
     private static boolean printMatchingLogs = false;
-    private static boolean forceDismemberment = false; // Set to true for 100% dismemberment chance (testing)
+    private static boolean forceDismemberment = true; // Set to true for 100% dismemberment chance (testing)
 
     private static final HashMap<String, String[]> MONSTER_ATTACHMENTS = new HashMap<>();
     private static final HashMap<String, String[]> DISMEMBERABLE_PARTS = new HashMap<>();
+
+    // NEW: Child attachment mapping - defines which attachments follow their parent
+    private static final HashMap<String, String[]> MONSTER_CHILD_ATTACHMENTS = new HashMap<>();
     private static final String[] GLOBAL_ATTACHMENTS = {"weapon", "sword",
             "blade", "staff", "wand", "rod", "dagger", "spear", "axe", "club",
             "mace", "bow", "shield", "orb", "crystal", "gem", "whip"};
@@ -31,6 +31,7 @@ public class AttachmentConfig {
         // Configure attachments that ALWAYS detach
         MONSTER_ATTACHMENTS.put(TimeEater.ID, new String[] {"clock"});
         MONSTER_ATTACHMENTS.put(Sentry.ID, new String[] {"top", "bottom", "jewel"});
+        MONSTER_ATTACHMENTS.put(GremlinThief.ID, new String[] {"wepon"});
         MONSTER_ATTACHMENTS.put(SlaverRed.ID, new String[] {"weponred", "net"});
         MONSTER_ATTACHMENTS.put(OrbWalker.ID,
                 new String[] {
@@ -55,6 +56,18 @@ public class AttachmentConfig {
                         "tailfront"
                 });
 
+        MONSTER_ATTACHMENTS.put(Exploder.ID,
+                new String[] {
+                        "shell"
+                });
+
+        MONSTER_ATTACHMENTS.put(Spiker.ID,
+                new String[] {
+                        "body",
+                        "cover",
+                        "nose"
+                });
+
         MONSTER_ATTACHMENTS.put(TheGuardian.ID,
                 new String[] {
                         "b2", "b3", "b4", "b5", "b6", "b7", "b8",
@@ -74,8 +87,19 @@ public class AttachmentConfig {
                         "rightarmfg6", "rightarmfg7", "rightarmfg8", "rightarmfg9", "rightarmfg10"
                 });
 
+        // NEW: Configure parent-child relationships
+        // Format: Parent attachment name -> array of child attachment patterns
+        MONSTER_CHILD_ATTACHMENTS.put(GremlinThief.ID + ":head", new String[] {"eyes", "hornleft", "hornright"});
+        MONSTER_CHILD_ATTACHMENTS.put(GremlinWarrior.ID + ":legleft", new String[] {"footleft"});
+        MONSTER_CHILD_ATTACHMENTS.put(GremlinWarrior.ID + ":legright", new String[] {"footright"});
+        MONSTER_CHILD_ATTACHMENTS.put(GremlinWizard.ID + ":head", new String[] {"eyes", "eyelids", "horns"});
+
         // Configure parts that have a CHANCE to detach based on overkill
         DISMEMBERABLE_PARTS.put(Cultist.ID, new String[] {"head"});
+        DISMEMBERABLE_PARTS.put(GremlinThief.ID, new String[] {"head"});
+        DISMEMBERABLE_PARTS.put(GremlinWarrior.ID, new String[] {"legleft", "legright"});
+        DISMEMBERABLE_PARTS.put(GremlinWizard.ID, new String[] {"head"});
+        DISMEMBERABLE_PARTS.put(Byrd.ID, new String[] {"wingback", "wingfront", "wingleft", "wingright"});
 
         if (printMatchingLogs) {
             BaseMod.logger.info("STATIC CONFIG DEBUG: OrbWalker attachments = "
@@ -89,6 +113,45 @@ public class AttachmentConfig {
 
     public static String[] getDismemberablePartsForMonster(String monsterName) {
         return DISMEMBERABLE_PARTS.getOrDefault(monsterName, new String[0]);
+    }
+
+    // NEW: Get child attachments for a specific monster and parent attachment
+    public static String[] getChildAttachments(String monsterName, String parentAttachmentName) {
+        if (monsterName == null || parentAttachmentName == null) return new String[0];
+
+        String key = monsterName + ":" + parentAttachmentName.toLowerCase();
+        String[] directMatch = MONSTER_CHILD_ATTACHMENTS.get(key);
+        if (directMatch != null) {
+            return directMatch;
+        }
+
+        // Check for partial matches of parent name (e.g., "head_main" matches "head")
+        String parentLower = parentAttachmentName.toLowerCase();
+        for (Map.Entry<String, String[]> entry : MONSTER_CHILD_ATTACHMENTS.entrySet()) {
+            String entryKey = entry.getKey();
+            if (entryKey.startsWith(monsterName + ":")) {
+                String entryParent = entryKey.substring((monsterName + ":").length());
+                if (parentLower.contains(entryParent) || entryParent.contains(parentLower)) {
+                    return entry.getValue();
+                }
+            }
+        }
+
+        return new String[0];
+    }
+
+    // NEW: Check if an attachment should be a child of a given parent for a specific monster
+    public static boolean isChildAttachment(String monsterName, String parentName, String potentialChildName) {
+        String[] childPatterns = getChildAttachments(monsterName, parentName);
+        String childLower = potentialChildName.toLowerCase();
+
+        for (String pattern : childPatterns) {
+            String patternLower = pattern.toLowerCase();
+            if (childLower.contains(patternLower) || childLower.equals(patternLower)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Original method for guaranteed attachments only
@@ -188,6 +251,22 @@ public class AttachmentConfig {
 
         return false;
     }
+
+    // Utility method for debugging monster-specific child relationships
+    public static void debugChildRelationships(String monsterName) {
+        BaseMod.logger.info("=== CHILD ATTACHMENT DEBUG FOR " + monsterName + " ===");
+
+        String prefix = monsterName + ":";
+        for (Map.Entry<String, String[]> entry : MONSTER_CHILD_ATTACHMENTS.entrySet()) {
+            String key = entry.getKey();
+            if (key.startsWith(prefix)) {
+                String parent = key.substring(prefix.length());
+                String[] children = entry.getValue();
+                BaseMod.logger.info("Parent '" + parent + "' -> Children: " + java.util.Arrays.toString(children));
+            }
+        }
+    }
+
 
     public static void debugAttachmentScaling(String monsterName, Skeleton skeleton) {
         if (!monsterName.equals(TheGuardian.ID)) return;

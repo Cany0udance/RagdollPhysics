@@ -6,6 +6,9 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.evacipated.cardcrawl.modthespire.lib.SpireReturn;
 import com.megacrit.cardcrawl.dungeons.AbstractDungeon;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
+import com.megacrit.cardcrawl.monsters.beyond.Exploder;
+import com.megacrit.cardcrawl.vfx.combat.ExplosionSmallEffect;
+import ragdollphysics.effects.TrackingExplosionEffect;
 import ragdollphysics.ragdollutil.ReflectionHelper;
 
 import java.util.HashMap;
@@ -31,6 +34,12 @@ public class RagdollManager {
     // Logging and debugging
     private final long creationTime = System.currentTimeMillis();
     private final String managerId = "RagdollMgr_" + (creationTime % 10000);
+
+    // EXPLODER.
+
+    private final HashMap<AbstractMonster, Float> exploderTimers = new HashMap<>();
+    private final Set<AbstractMonster> explodedExploders = new HashSet<>();
+    private static final float EXPLODER_AUTO_EXPLODE_TIME = 2.5f;
 
     public RagdollManager() {
         BaseMod.logger.info("[" + managerId + "] RagdollManager initialized");
@@ -115,6 +124,8 @@ public class RagdollManager {
         if (ragdoll != null) {
             try {
                 ragdoll.update(Gdx.graphics.getDeltaTime());
+
+                handleExploderLogic(monster, ragdoll);
 
                 // Only advance death timer if ragdoll has settled
                 if (ragdoll.hasSettledOnGround()) {
@@ -201,6 +212,74 @@ public class RagdollManager {
 
         // NEW: Clean up overkill tracking
         OverkillTracker.cleanup(monster);
+
+        exploderTimers.remove(monster);
+        explodedExploders.remove(monster);
+    }
+
+    private void handleExploderLogic(AbstractMonster monster, MultiBodyRagdoll ragdoll) {
+        // Only handle Exploder monsters
+        if (!monster.id.equals(Exploder.ID)) {
+            return;
+        }
+
+        // Skip if already exploded
+        if (explodedExploders.contains(monster)) {
+            return;
+        }
+
+        // Initialize timer for new Exploders
+        if (!exploderTimers.containsKey(monster)) {
+            exploderTimers.put(monster, 0f);
+            BaseMod.logger.info("[" + managerId + "] Started Exploder timer for " + monster.getClass().getSimpleName());
+        }
+
+        // Update timer
+        float timer = exploderTimers.get(monster) + Gdx.graphics.getDeltaTime();
+        exploderTimers.put(monster, timer);
+
+        // Check if we should explode
+        boolean shouldExplode = false;
+        String explodeReason = "";
+
+        // Auto-explode after timeout
+        if (timer >= EXPLODER_AUTO_EXPLODE_TIME) {
+            shouldExplode = true;
+            explodeReason = "timeout after " + String.format("%.2f", timer) + "s";
+        }
+        // Explode before despawn (when fade starts)
+        else if (monster.deathTimer < 1.2f && monster.tintFadeOutCalled) {
+            shouldExplode = true;
+            explodeReason = "pre-despawn fade";
+        }
+
+        if (shouldExplode) {
+            triggerExploderExplosion(monster, ragdoll, explodeReason);
+        }
+    }
+
+    private void triggerExploderExplosion(AbstractMonster monster, MultiBodyRagdoll ragdoll, String reason) {
+        explodedExploders.add(monster);
+
+        // Get explosion position from ragdoll center
+        float explosionX = ragdoll.getCenterX();
+        float explosionY = ragdoll.getCenterY();
+
+        // Create the explosion effect
+        AbstractDungeon.effectsQueue.add(new TrackingExplosionEffect(monster, ragdoll));
+
+        // Base game explosion:
+        //     AbstractDungeon.effectsQueue.add(new ExplosionSmallEffect(explosionX, explosionY));
+
+        BaseMod.logger.info("[" + managerId + "] EXPLODER EXPLOSION triggered for "
+                + monster.getClass().getSimpleName() + " at ("
+                + String.format("%.1f", explosionX) + ", " + String.format("%.1f", explosionY)
+                + ") - reason: " + reason);
+
+        // Accelerate death timer to mask despawning with explosion
+        if (monster.deathTimer > 0.3f) {
+            monster.deathTimer = 0.3f; // Give explosion a moment to play
+        }
     }
 
     /**
@@ -213,6 +292,9 @@ public class RagdollManager {
                     + monster.getClass().getSimpleName());
         }
         failedRagdolls.remove(monster);
+
+        exploderTimers.remove(monster);
+        explodedExploders.remove(monster);
     }
 
     /**
@@ -281,6 +363,9 @@ public class RagdollManager {
 
         BaseMod.logger.info("[" + managerId + "] Complete cleanup - removed "
                 + ragdollCount + " ragdolls and " + failedCount + " failed markers");
+
+        exploderTimers.clear();
+        explodedExploders.clear();
     }
 
     /**
