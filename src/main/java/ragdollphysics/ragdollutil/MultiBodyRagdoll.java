@@ -187,8 +187,18 @@ public class MultiBodyRagdoll {
 
                     if (slot.getAttachment() instanceof RegionAttachment) {
                         RegionAttachment regionAttachment = (RegionAttachment) slot.getAttachment();
-                        attachmentX = startX + (bone.getWorldX() + regionAttachment.getX()) * Settings.scale;
-                        attachmentY = startY + (bone.getWorldY() + regionAttachment.getY()) * Settings.scale;
+
+                        // Get the attachment's local offset relative to its bone
+                        float localX = regionAttachment.getX();
+                        float localY = regionAttachment.getY();
+
+                        // Apply bone transformation to the local offset
+                        float transformedX = bone.getA() * localX + bone.getB() * localY;
+                        float transformedY = bone.getC() * localX + bone.getD() * localY;
+
+                        // Final position: monster position + (bone world pos + transformed offset) * scale
+                        attachmentX = monster.drawX + (bone.getWorldX() + transformedX) * Settings.scale;
+                        attachmentY = monster.drawY + (bone.getWorldY() + transformedY) * Settings.scale;
                     } else if (slot.getAttachment() instanceof MeshAttachment) {
                         MeshAttachment meshAttachment = (MeshAttachment) slot.getAttachment();
 
@@ -261,8 +271,18 @@ public class MultiBodyRagdoll {
 
                 if (data.slot.getAttachment() instanceof RegionAttachment) {
                     RegionAttachment regionAttachment = (RegionAttachment) data.slot.getAttachment();
-                    attachmentX = startX + (data.bone.getWorldX() + regionAttachment.getX()) * Settings.scale;
-                    attachmentY = startY + (data.bone.getWorldY() + regionAttachment.getY()) * Settings.scale;
+
+                    // Get the attachment's local offset relative to its bone
+                    float localX = regionAttachment.getX();
+                    float localY = regionAttachment.getY();
+
+                    // Apply bone transformation to the local offset
+                    float transformedX = data.bone.getA() * localX + data.bone.getB() * localY;
+                    float transformedY = data.bone.getC() * localX + data.bone.getD() * localY;
+
+                    // Final position: monster position + (bone world pos + transformed offset) * scale
+                    attachmentX = monster.drawX + (data.bone.getWorldX() + transformedX) * Settings.scale;
+                    attachmentY = monster.drawY + (data.bone.getWorldY() + transformedY) * Settings.scale;
                 } else if (data.slot.getAttachment() instanceof MeshAttachment) {
                     MeshAttachment meshAttachment = (MeshAttachment) data.slot.getAttachment();
 

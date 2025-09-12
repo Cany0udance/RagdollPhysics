@@ -50,7 +50,7 @@ public class AttachmentPhysics {
         this.x = startX;
         this.y = startY;
         this.groundY = groundLevel;
-        this.rotation = bone.getRotation();
+        this.rotation = bone.getWorldRotationX();
         this.attachment = attachment;
         this.attachmentName = attachmentName;
         this.attachmentId = "Attachment_" + attachmentName + "_" + System.currentTimeMillis() % 1000;
