@@ -5,8 +5,9 @@ import com.esotericsoftware.spine.Bone;
 import com.esotericsoftware.spine.Skeleton;
 import com.esotericsoftware.spine.Slot;
 import com.megacrit.cardcrawl.core.Settings;
-import com.megacrit.cardcrawl.monsters.beyond.Exploder;
+import com.megacrit.cardcrawl.monsters.beyond.*;
 import com.megacrit.cardcrawl.monsters.city.*;
+import com.megacrit.cardcrawl.monsters.ending.CorruptHeart;
 import com.megacrit.cardcrawl.monsters.exordium.*;
 
 import java.util.Arrays;
@@ -32,6 +33,18 @@ public class CenterOfMassConfig {
         customBodyAttachments.put(SphericGuardian.ID, new String[]{"orb_main"});
         customBodyAttachments.put(Chosen.ID, new String[]{"skin"});
         customBodyAttachments.put(ShelledParasite.ID, new String[]{"upperBody"});
+        customBodyAttachments.put(Lagavulin.ID, new String[]{"Shell1", "Shell2"});
+        customBodyAttachments.put(Centurion.ID, new String[]{"chestArmor"});
+        customBodyAttachments.put(Healer.ID, new String[]{"coat"});
+        customBodyAttachments.put(Taskmaster.ID, new String[]{"middle"});
+        customBodyAttachments.put(Nemesis.ID, new String[]{"cloak"});
+        customBodyAttachments.put(WrithingMass.ID, new String[]{"leftMass"});
+        customBodyAttachments.put(SpireGrowth.ID, new String[]{"tentacle_center"});
+        customBodyAttachments.put(Champ.ID, new String[]{"lowerChest"});
+        customBodyAttachments.put(BronzeAutomaton.ID, new String[]{"chest"});
+        customBodyAttachments.put(GiantHead.ID, new String[]{"head"});
+        customBodyAttachments.put(TimeEater.ID, new String[]{"cloak_fg"});
+        customBodyAttachments.put(CorruptHeart.ID, new String[]{"cloak_fg"});
     }
 
     // Calculate center of mass offset based on actual skeleton body bone position

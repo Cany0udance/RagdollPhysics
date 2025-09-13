@@ -46,6 +46,7 @@ public class RagdollPhysics implements
     private static SpireConfig config;
     public static boolean enableZeroGravity;
     public static boolean enableDebugSquares;
+    public static boolean enableImageRagdolls;
 
     public static String makeID(String id) {
         return modID + ":" + id;
@@ -55,10 +56,12 @@ public class RagdollPhysics implements
     public static void initialize() throws IOException {
         Properties defaults = new Properties();
         defaults.setProperty("enableZeroGravity", "false");
-        defaults.setProperty("enableDebugSqures", "false");
+        defaults.setProperty("enableDebugSquares", "false");
+        defaults.setProperty("enableImageRagdolls", "true");
         config = new SpireConfig(modID, "config", defaults);
         enableZeroGravity = config.getBool("enableZeroGravity");
         enableDebugSquares = config.getBool("enableDebugSquares");
+        enableImageRagdolls = config.getBool("enableImageRagdolls");
         new RagdollPhysics();
     }
 
@@ -73,6 +76,7 @@ public class RagdollPhysics implements
 
         String toggleText1 = "Enable zero gravity mode";
         String toggleText2 = "Enable debug squares (requires restart)";
+        String toggleText3 = "Enable ragdolls for image-based enemies";
 
 
         // Always display names toggle
@@ -86,6 +90,12 @@ public class RagdollPhysics implements
         settingsPanel.addUIElement(new ModLabeledToggleButton(toggleText2, 350, 650, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableDebugSquares"), settingsPanel, label -> {}, button -> {
             enableDebugSquares = button.enabled;
             config.setBool("enableDebugSquares", button.enabled);
+            try {config.save();} catch (Exception e) {}
+        }));
+
+        settingsPanel.addUIElement(new ModLabeledToggleButton(toggleText3, 350, 600, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableImageRagdolls"), settingsPanel, label -> {}, button -> {
+            enableImageRagdolls = button.enabled;
+            config.setBool("enableImageRagdolls", button.enabled);
             try {config.save();} catch (Exception e) {}
         }));
 

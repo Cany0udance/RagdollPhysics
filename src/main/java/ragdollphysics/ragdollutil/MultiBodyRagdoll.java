@@ -32,6 +32,9 @@ public class MultiBodyRagdoll {
     private final AbstractMonster associatedMonster;
     private static Texture debugSquareTexture = null;
 
+
+    private final List<String> attachmentDrawOrder = new ArrayList<>();
+
     // Fields for shadow fading
     private static class FadeableSlot {
         final Slot slot;
@@ -242,6 +245,7 @@ public class MultiBodyRagdoll {
 
                     parentAttachments.put(attachmentName.toLowerCase(), parentAttachment);
                     attachmentBodies.put(attachmentName, parentAttachment);
+                    attachmentDrawOrder.add(attachmentName);
                     attachmentCount++;
 
                     if (printInitializationLogs) {
@@ -326,6 +330,7 @@ public class MultiBodyRagdoll {
                         parentAttachment); // Link to parent
 
                 attachmentBodies.put(attachmentName, childAttachment);
+                attachmentDrawOrder.add(attachmentName);
                 attachmentCount++;
                 childrenCreated++;
 
@@ -857,12 +862,6 @@ public class MultiBodyRagdoll {
         // Set proper blend function for alpha blending (if not already set)
         if (srcFunc != GL20.GL_SRC_ALPHA || dstFunc != GL20.GL_ONE_MINUS_SRC_ALPHA) {
             sb.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-
-            if (updateCount % 300 == 0 && canLog()) {
-                BaseMod.logger.info("[" + ragdollId + "] Set blend function from ("
-                        + srcFunc + ", " + dstFunc
-                        + ") to (SRC_ALPHA, ONE_MINUS_SRC_ALPHA)");
-            }
         }
 
         // Get monster's current tint color for synchronized fading
@@ -873,29 +872,24 @@ public class MultiBodyRagdoll {
             return;
         }
 
-        for (Map.Entry<String, AttachmentPhysics> entry : attachmentBodies.entrySet()) {
-            String attachmentName = entry.getKey();
-            AttachmentPhysics attachmentPhysics = entry.getValue();
+        // Log scale override being used
+        if (updateCount % 300 == 0 && canLog() && AttachmentScaleConfig.hasCustomScale(monsterClassName)) {
+            BaseMod.logger.info("[" + ragdollId + "] Using custom scale multiplier for " + monsterClassName
+                    + ": " + AttachmentScaleConfig.getAttachmentScaleMultiplier(monsterClassName));
+        }
+
+        // Render attachments in their original slot order
+        for (String attachmentName : attachmentDrawOrder) {
+            AttachmentPhysics attachmentPhysics = attachmentBodies.get(attachmentName);
+            if (attachmentPhysics == null) continue;
 
             boolean rendered = false;
-
-            // Store current color to restore later
             Color currentColor = sb.getColor();
-
-            // Apply monster's tint color directly to attachments for synchronized fading
             sb.setColor(monsterColor);
-
-            // DEBUG: Log rendering attempts for fading attachments
-            if (monsterColor.a < 0.8f && updateCount % 120 == 0) {
-                BaseMod.logger.info("[" + ragdollId + "] RENDERING attachment '"
-                        + attachmentName + "' with monster alpha: "
-                        + String.format("%.2f", monsterColor.a) + ", blend: ("
-                        + sb.getBlendSrcFunc() + ", " + sb.getBlendDstFunc() + ")");
-            }
 
             if (attachmentPhysics.attachment != null) {
                 try {
-                    // Handle RegionAttachment
+                    // Handle RegionAttachment with monster-specific scaling
                     if (attachmentPhysics.attachment instanceof RegionAttachment) {
                         RegionAttachment regionAttachment = (RegionAttachment) attachmentPhysics.attachment;
                         TextureAtlas.AtlasRegion region = (TextureAtlas.AtlasRegion) regionAttachment.getRegion();
@@ -906,10 +900,19 @@ public class MultiBodyRagdoll {
                             float attachmentScaleX = regionAttachment.getScaleX();
                             float attachmentScaleY = regionAttachment.getScaleY();
                             float attachmentRotation = regionAttachment.getRotation();
-                            float finalWidth = regionPixelWidth * Math.abs(attachmentScaleX) * Settings.scale;
-                            float finalHeight = regionPixelHeight * Math.abs(attachmentScaleY) * Settings.scale;
-                            float offsetX = regionAttachment.getX() * attachmentScaleX * Settings.scale;
-                            float offsetY = regionAttachment.getY() * attachmentScaleY * Settings.scale;
+
+                            // Use the new scale calculation method
+                            float[] dimensions = AttachmentScaleConfig.calculateRenderDimensions(
+                                    monsterClassName, regionPixelWidth, regionPixelHeight,
+                                    attachmentPhysics.originalScaleX, attachmentPhysics.originalScaleY);
+
+                            float finalWidth = dimensions[0] * Math.abs(attachmentScaleX);
+                            float finalHeight = dimensions[1] * Math.abs(attachmentScaleY);
+
+                            // Apply monster-specific scaling to offsets too
+                            float scaleMultiplier = AttachmentScaleConfig.getAttachmentScaleMultiplier(monsterClassName);
+                            float offsetX = regionAttachment.getX() * attachmentScaleX * scaleMultiplier * Settings.scale;
+                            float offsetY = regionAttachment.getY() * attachmentScaleY * scaleMultiplier * Settings.scale;
 
                             sb.draw(region, attachmentPhysics.x - finalWidth / 2f + offsetX,
                                     attachmentPhysics.y - finalHeight / 2f + offsetY,
@@ -918,21 +921,32 @@ public class MultiBodyRagdoll {
 
                             rendered = true;
                             attachmentsRendered++;
+
+                            // Debug log for Guardian scaling
+                            if (monsterClassName.equals(TheGuardian.ID) && updateCount % 300 == 0 && canLog()) {
+                                BaseMod.logger.info("[" + ragdollId + "] Guardian attachment '" + attachmentName
+                                        + "' - base: " + regionPixelWidth + "x" + regionPixelHeight
+                                        + " -> final: " + String.format("%.1f", finalWidth) + "x" + String.format("%.1f", finalHeight)
+                                        + " (scale: " + scaleMultiplier + ")");
+                            }
                         }
                     }
-                    // Handle MeshAttachment
+                    // Handle MeshAttachment with monster-specific scaling
                     else if (attachmentPhysics.attachment instanceof MeshAttachment) {
                         MeshAttachment meshAttachment = (MeshAttachment) attachmentPhysics.attachment;
                         TextureAtlas.AtlasRegion region = (TextureAtlas.AtlasRegion) meshAttachment.getRegion();
 
                         if (region != null) {
-                            float width = region.getRegionWidth() * Settings.scale;
-                            float height = region.getRegionHeight() * Settings.scale;
+                            float baseWidth = region.getRegionWidth();
+                            float baseHeight = region.getRegionHeight();
 
-                            if (attachmentPhysics.originalBone != null) {
-                                width *= Math.abs(attachmentPhysics.originalScaleX);
-                                height *= Math.abs(attachmentPhysics.originalScaleY);
-                            }
+                            // Use the new scale calculation method
+                            float[] dimensions = AttachmentScaleConfig.calculateRenderDimensions(
+                                    monsterClassName, baseWidth, baseHeight,
+                                    attachmentPhysics.originalScaleX, attachmentPhysics.originalScaleY);
+
+                            float width = dimensions[0];
+                            float height = dimensions[1];
 
                             float finalRotation = attachmentPhysics.rotation;
 
@@ -959,17 +973,20 @@ public class MultiBodyRagdoll {
                 }
             }
 
-            // Fallback rendering
+            // Fallback rendering with custom scaling
             if (!rendered) {
                 TextureAtlas.AtlasRegion region = atlas.findRegion(attachmentName);
                 if (region != null) {
-                    float width = region.getRegionWidth() * Settings.scale;
-                    float height = region.getRegionHeight() * Settings.scale;
+                    float baseWidth = region.getRegionWidth();
+                    float baseHeight = region.getRegionHeight();
 
-                    if (attachmentPhysics.originalBone != null) {
-                        width *= Math.abs(attachmentPhysics.originalScaleX);
-                        height *= Math.abs(attachmentPhysics.originalScaleY);
-                    }
+                    // Use the new scale calculation method
+                    float[] dimensions = AttachmentScaleConfig.calculateRenderDimensions(
+                            monsterClassName, baseWidth, baseHeight,
+                            attachmentPhysics.originalScaleX, attachmentPhysics.originalScaleY);
+
+                    float width = dimensions[0];
+                    float height = dimensions[1];
 
                     sb.draw(region, attachmentPhysics.x - width / 2f,
                             attachmentPhysics.y - height / 2f, width / 2f, height / 2f,
@@ -980,7 +997,6 @@ public class MultiBodyRagdoll {
                 }
             }
 
-            // Restore original color
             sb.setColor(currentColor);
         }
 
@@ -989,12 +1005,13 @@ public class MultiBodyRagdoll {
             sb.setBlendFunction(srcFunc, dstFunc);
         }
 
-        // Updated logging without fade references
         if (updateCount % 300 == 0 && canLog()
                 && (attachmentsRendered > 0 || attachmentsFailed > 0)) {
             BaseMod.logger.info("[" + ragdollId + "] Attachment render summary - rendered: " + attachmentsRendered
                     + ", failed: " + attachmentsFailed
-                    + ", monster alpha: " + String.format("%.2f", monsterColor.a));
+                    + ", monster alpha: " + String.format("%.2f", monsterColor.a)
+                    + (AttachmentScaleConfig.hasCustomScale(monsterClassName) ?
+                    ", custom scale: " + AttachmentScaleConfig.getAttachmentScaleMultiplier(monsterClassName) : ""));
             lastLogTime = System.currentTimeMillis();
         }
     }

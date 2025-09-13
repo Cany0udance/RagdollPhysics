@@ -56,6 +56,7 @@ public class PhysicsModifier {
         ENEMY_WEIGHTS.put(SlaverRed.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(SlaverBlue.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(Looter.ID, EnemyWeight.MEDIUM);
+        ENEMY_WEIGHTS.put(Lagavulin.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(Mugger.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(BanditLeader.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(BanditPointy.ID, EnemyWeight.MEDIUM);
@@ -66,12 +67,18 @@ public class PhysicsModifier {
         ENEMY_WEIGHTS.put(Snecko.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(Centurion.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(Healer.ID, EnemyWeight.MEDIUM);
+        ENEMY_WEIGHTS.put(BookOfStabbing.ID, EnemyWeight.MEDIUM);
+        ENEMY_WEIGHTS.put(GremlinLeader.ID, EnemyWeight.MEDIUM);
+        ENEMY_WEIGHTS.put(Taskmaster.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(OrbWalker.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(Darkling.ID, EnemyWeight.MEDIUM);
+        ENEMY_WEIGHTS.put(Reptomancer.ID, EnemyWeight.MEDIUM);
+        ENEMY_WEIGHTS.put(Nemesis.ID, EnemyWeight.MEDIUM);
 
         // Heavy enemies (barely budge)
         ENEMY_WEIGHTS.put(SpikeSlime_L.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(AcidSlime_L.ID, EnemyWeight.HEAVY);
+        ENEMY_WEIGHTS.put(GremlinNob.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(BanditBear.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(Maw.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(WrithingMass.ID, EnemyWeight.HEAVY);
@@ -81,6 +88,7 @@ public class PhysicsModifier {
         ENEMY_WEIGHTS.put(SlimeBoss.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(Champ.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(BronzeAutomaton.ID, EnemyWeight.HEAVY);
+        ENEMY_WEIGHTS.put(GiantHead.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(Donu.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(Deca.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(TimeEater.ID, EnemyWeight.HEAVY);
@@ -116,7 +124,7 @@ public class PhysicsModifier {
     private static final float MAX_HORIZONTAL_SCALE = 1.5f;  // At 50 overkill, increase to 150% of normal
 
     // Vertical velocity scaling (tiered system for more dramatic differences)
-    private static final float VERTICAL_TINY_HOP_SCALE = 0.15f;     // 0-5 overkill: barely hop
+    private static final float VERTICAL_TINY_HOP_SCALE = 0.3f;     // 0-5 overkill: barely hop
     private static final float VERTICAL_SMALL_HOP_SCALE = 0.4f;     // 6-19 overkill: small jump
     private static final float VERTICAL_BASELINE_SCALE = 1.0f;      // 20 overkill: baseline
     private static final float VERTICAL_MAX_SCALE = 1.3f;           // 21-50 overkill: bigger jump (capped)

@@ -15,7 +15,7 @@ import java.util.Random;
 
 public class AttachmentConfig {
     private static boolean printMatchingLogs = false;
-    private static boolean forceDismemberment = true; // Set to true for 100% dismemberment chance (testing)
+    private static boolean forceDismemberment = false; // Set to true for 100% dismemberment chance (testing)
 
     private static final HashMap<String, String[]> MONSTER_ATTACHMENTS = new HashMap<>();
     private static final HashMap<String, String[]> DISMEMBERABLE_PARTS = new HashMap<>();
@@ -123,6 +123,56 @@ public class AttachmentConfig {
                         "leafRightBack2"
                 });
 
+        MONSTER_ATTACHMENTS.put(Snecko.ID,
+                new String[] {
+                        "eye"
+                });
+
+        MONSTER_ATTACHMENTS.put(Centurion.ID,
+                new String[] {
+                        "shield"
+                });
+
+        MONSTER_ATTACHMENTS.put(Healer.ID,
+                new String[] {
+                        "book"
+                });
+
+        MONSTER_ATTACHMENTS.put(Nemesis.ID,
+                new String[] {
+                        "scythe",
+                        "skull"
+                });
+
+        MONSTER_ATTACHMENTS.put(Nemesis.ID,
+                new String[] {
+                        "leftMass",
+                        "rightMass"
+                });
+
+        MONSTER_ATTACHMENTS.put(SpireGrowth.ID,
+                new String[] {
+                        "tentacle_left",
+                        "tentacle_right"
+                });
+
+        MONSTER_ATTACHMENTS.put(SlimeBoss.ID,
+                new String[] {
+                        "hat"
+                });
+
+        MONSTER_ATTACHMENTS.put(Champ.ID,
+                new String[] {
+                        "crown",
+                        "sword",
+                        "shield"
+                });
+
+        MONSTER_ATTACHMENTS.put(TimeEater.ID,
+                new String[] {
+                        "tail"
+                });
+
         MONSTER_ATTACHMENTS.put(TheGuardian.ID,
                 new String[] {
                         "b2", "b3", "b4", "b5", "b6", "b7", "b8",
@@ -142,6 +192,16 @@ public class AttachmentConfig {
                         "rightarmfg6", "rightarmfg7", "rightarmfg8", "rightarmfg9", "rightarmfg10"
                 });
 
+        MONSTER_ATTACHMENTS.put(BronzeAutomaton.ID,
+                new String[] {
+                        "abdomen", "armLeft", "armRight", "chest",
+                        "footleft", "footright",
+                        "forearmLeft", "forearmRight", "handRight",
+                        "quadLeft", "quadRight",
+                        "shoulderLeft", "shoulderRight",
+                        "thighleft", "thighright"
+                });
+
         // NEW: Configure parent-child relationships
         // Format: Parent attachment name -> array of child attachment patterns
         MONSTER_CHILD_ATTACHMENTS.put(GremlinThief.ID + ":head", new String[] {"eyes", "hornleft", "hornright"});
@@ -149,16 +209,22 @@ public class AttachmentConfig {
         MONSTER_CHILD_ATTACHMENTS.put(GremlinWarrior.ID + ":legright", new String[] {"footright"});
         MONSTER_CHILD_ATTACHMENTS.put(GremlinWizard.ID + ":head", new String[] {"eyes", "eyelids", "horns"});
         MONSTER_CHILD_ATTACHMENTS.put(BanditBear.ID + ":mask", new String[] {"right_eye", "left_eye"});
+        MONSTER_CHILD_ATTACHMENTS.put(Snecko.ID + ":eye", new String[] {"pupil", "iris"});
         MONSTER_CHILD_ATTACHMENTS.put(ShelledParasite.ID + ":lowerBody", new String[] {"mouth"});
+        MONSTER_CHILD_ATTACHMENTS.put(Centurion.ID + ":shield", new String[] {"shieldhandles"});
+        MONSTER_CHILD_ATTACHMENTS.put(Champ.ID + ":sword", new String[] {"swordHilt"});
+        MONSTER_CHILD_ATTACHMENTS.put(Champ.ID + ":shield", new String[] {"handle"});
 
         // Configure parts that have a CHANCE to detach based on overkill
         DISMEMBERABLE_PARTS.put(Cultist.ID, new String[] {"head"});
         DISMEMBERABLE_PARTS.put(GremlinThief.ID, new String[] {"head"});
         DISMEMBERABLE_PARTS.put(GremlinWarrior.ID, new String[] {"legleft", "legright"});
         DISMEMBERABLE_PARTS.put(GremlinWizard.ID, new String[] {"head"});
+        DISMEMBERABLE_PARTS.put(GremlinNob.ID, new String[] {"hornleft", "hornright"});
         DISMEMBERABLE_PARTS.put(Byrd.ID, new String[] {"wingback", "wingfront", "wingleft", "wingright"});
         DISMEMBERABLE_PARTS.put(BanditPointy.ID, new String[] {"head"});
         DISMEMBERABLE_PARTS.put(BanditBear.ID, new String[] {"mask"});
+        DISMEMBERABLE_PARTS.put(Snecko.ID, new String[] {"tail"});
 
         if (printMatchingLogs) {
             BaseMod.logger.info("STATIC CONFIG DEBUG: OrbWalker attachments = "

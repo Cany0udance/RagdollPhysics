@@ -15,6 +15,7 @@ import com.megacrit.cardcrawl.monsters.beyond.TimeEater;
 import com.megacrit.cardcrawl.monsters.city.BronzeOrb;
 import com.megacrit.cardcrawl.monsters.city.Byrd;
 import com.megacrit.cardcrawl.monsters.exordium.*;
+import ragdollphysics.RagdollPhysics;
 
 /**
  * Factory for creating ragdoll physics instances.
@@ -58,7 +59,7 @@ public class RagdollFactory {
             case SnakeDagger.ID:
                 return AbstractDungeon.player.drawY + (20f * Settings.scale);
             default:
-                return baseGroundLevel + (20f * Settings.scale);
+                return AbstractDungeon.player.drawY + (20f * Settings.scale);
         }
     }
 
@@ -67,7 +68,7 @@ public class RagdollFactory {
      *
      * @param monster The monster to create a ragdoll for
      * @param reflectionHelper Helper for accessing monster internals
-     * @return Created ragdoll instance
+     * @return Created ragdoll instance, or null if image physics is disabled for image-based monsters
      * @throws Exception if ragdoll creation fails
      */
     public MultiBodyRagdoll createRagdoll(AbstractMonster monster, ReflectionHelper reflectionHelper) throws Exception {
@@ -82,8 +83,16 @@ public class RagdollFactory {
 
         try {
             MultiBodyRagdoll ragdoll;
+
             // Determine creation path based on monster type
             if (isImageBasedMonster(monster, reflectionHelper)) {
+                // Check if image physics is enabled before creating image ragdoll
+                if (!ragdollphysics.RagdollPhysics.enableImageRagdolls) {
+                    if (printFactoryLogs) {
+                        BaseMod.logger.info("[" + factoryId + "] Image physics disabled - skipping ragdoll creation for image-based monster " + monsterName);
+                    }
+                    return null; // Don't create ragdoll for image-based monsters when disabled
+                }
                 ragdoll = createImageRagdoll(monster);
             } else {
                 ragdoll = createSkeletonRagdoll(monster, reflectionHelper);
@@ -316,11 +325,20 @@ public class RagdollFactory {
      * Apply initial physics force to the ragdoll
      */
     private void applyInitialForce(MultiBodyRagdoll ragdoll) {
-        float forceX = MathUtils.random(MIN_FORCE_X, MAX_FORCE_X);
+        float baseForceX = MathUtils.random(MIN_FORCE_X, MAX_FORCE_X);
         float forceY = MathUtils.random(MIN_FORCE_Y, MAX_FORCE_Y);
 
+        // Determine direction based on monster position relative to player
+        float playerX = AbstractDungeon.player.drawX;
+        float monsterX = ragdoll.getAssociatedMonster().drawX;
+
+        // If monster is to the left of player, send it left (negative)
+        // If monster is to the right of player, send it right (positive)
+        float forceX = (monsterX < playerX) ? -baseForceX : baseForceX;
+
         if (printFactoryLogs) {
-            BaseMod.logger.info("[" + factoryId + "] Applying initial force: (" + forceX + ", " + forceY + ")");
+            BaseMod.logger.info("[" + factoryId + "] Directional force - Player: " + playerX
+                    + ", Monster: " + monsterX + ", Force: (" + forceX + ", " + forceY + ")");
         }
 
         ragdoll.applyGlobalForce(forceX, forceY);
