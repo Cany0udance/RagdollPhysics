@@ -485,8 +485,7 @@ public class RagdollFactory {
         float baseForceX = MathUtils.random(MIN_FORCE_X, MAX_FORCE_X);
         float forceY = MathUtils.random(MIN_FORCE_Y, MAX_FORCE_Y);
 
-        // Players can fall in either direction - no monster position reference
-        float forceX = MathUtils.randomBoolean() ? baseForceX : -baseForceX;
+        float forceX = -baseForceX;
 
         ragdoll.applyGlobalForce(forceX, forceY);
 

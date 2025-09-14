@@ -41,7 +41,7 @@ public class RagdollPhysics {
     private static final float SIMPLE_BOUNCE_THRESHOLD = 200f;
     private static final float GRAVITY = -1200f;
     private static final float RIGHT_WALL_X = 1850f;
-    private static final float LEFT_WALL_X = 0f;
+    private static final float LEFT_WALL_X = 100f;
     private static final float CEILING_Y = 1100f;
 
 

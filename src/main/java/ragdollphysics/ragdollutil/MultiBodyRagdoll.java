@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.PolygonSpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
 import com.esotericsoftware.spine.Bone;
 import com.esotericsoftware.spine.Skeleton;
@@ -195,15 +196,28 @@ public class MultiBodyRagdoll {
 
     /** Initialize attachment physics bodies - now works with any AbstractCreature */
     private void initializeAttachments(Skeleton skeleton, AbstractCreature entity, float startX, float startY) {
+        BaseMod.logger.info("=== ATTACHMENT INITIALIZATION DEBUG ===");
+        BaseMod.logger.info("Entity: " + entityClassName);
+        BaseMod.logger.info("Entity type: " + entity.getClass().getSimpleName());
+
         float overkillDamage = OverkillTracker.getOverkillDamage(entity);
         HashMap<String, AttachmentPhysics> parentAttachments = new HashMap<>();
         List<SlotAttachmentData> potentialChildren = new ArrayList<>();
 
-        // First pass: Create parent attachments
+        // Log all slots and their attachments
+        BaseMod.logger.info("Total slots found: " + skeleton.getSlots().size);
         for (Slot slot : skeleton.getSlots()) {
+            String slotName = slot.getData().getName();
+            String boneName = slot.getBone().getData().getName();
+            String attachmentName = slot.getAttachment() != null ? slot.getAttachment().getName() : "null";
+
+            BaseMod.logger.info("Slot: " + slotName + " | Bone: " + boneName + " | Attachment: " + attachmentName);
+
             if (slot.getAttachment() != null) {
-                String attachmentName = slot.getAttachment().getName();
-                boolean shouldDetach = AttachmentConfig.shouldDetachAttachment(entityClassName, attachmentName, overkillDamage);
+                String attachmentNameFull = slot.getAttachment().getName();
+                boolean shouldDetach = AttachmentConfig.shouldDetachAttachment(entityClassName, attachmentNameFull, overkillDamage);
+
+                BaseMod.logger.info("  -> Should detach: " + shouldDetach);
 
                 if (shouldDetach) {
                     float[] position = calculateAttachmentPosition(slot, entity, startX, startY);
@@ -233,6 +247,9 @@ public class MultiBodyRagdoll {
                 attachmentDrawOrder.add(data.attachmentName);
             }
         }
+
+        BaseMod.logger.info("Created " + attachmentBodies.size() + " attachment physics bodies");
+        BaseMod.logger.info("=== END ATTACHMENT DEBUG ===");
     }
 
     /** Calculate attachment position - now works with any AbstractCreature */
@@ -538,6 +555,10 @@ public class MultiBodyRagdoll {
 
     /** Render detached attachments - now works with any AbstractCreature */
     public void renderDetachedAttachments(PolygonSpriteBatch sb, TextureAtlas atlas, AbstractCreature entity) {
+        BaseMod.logger.info("=== RENDER ATTACHMENTS DEBUG ===");
+        BaseMod.logger.info("Entity: " + entityClassName + " | Attachment count: " + attachmentBodies.size());
+        BaseMod.logger.info("Entity tint alpha: " + entity.tint.color.a);
+
         // Store and set proper blend function
         int srcFunc = sb.getBlendSrcFunc();
         int dstFunc = sb.getBlendDstFunc();
@@ -548,13 +569,20 @@ public class MultiBodyRagdoll {
         // Skip if entity has completely faded
         Color entityColor = entity.tint.color;
         if (entityColor.a <= 0) {
+            BaseMod.logger.info("Skipping render - entity alpha is 0");
             return;
         }
 
         // Render attachments in draw order
         for (String attachmentName : attachmentDrawOrder) {
             AttachmentPhysics attachmentPhysics = attachmentBodies.get(attachmentName);
-            if (attachmentPhysics == null) continue;
+            if (attachmentPhysics == null) {
+                BaseMod.logger.info("Attachment physics null for: " + attachmentName);
+                continue;
+            }
+
+            BaseMod.logger.info("Rendering attachment: " + attachmentName +
+                    " at (" + attachmentPhysics.x + ", " + attachmentPhysics.y + ")");
 
             Color currentColor = sb.getColor();
             sb.setColor(entityColor);
@@ -562,6 +590,8 @@ public class MultiBodyRagdoll {
             renderSingleAttachment(sb, atlas, attachmentPhysics, attachmentName);
             sb.setColor(currentColor);
         }
+
+        BaseMod.logger.info("=== END RENDER DEBUG ===");
 
         // Restore original blend function
         if (srcFunc != GL20.GL_SRC_ALPHA || dstFunc != GL20.GL_ONE_MINUS_SRC_ALPHA) {
@@ -580,13 +610,16 @@ public class MultiBodyRagdoll {
                     rendered = renderRegionAttachment(sb, (RegionAttachment) attachmentPhysics.attachment, attachmentPhysics);
                 } else if (attachmentPhysics.attachment instanceof MeshAttachment) {
                     rendered = renderMeshAttachment(sb, (MeshAttachment) attachmentPhysics.attachment, attachmentPhysics, attachmentName);
+                } else {
+                    // Handle custom Haberdashery attachment types
+                    rendered = renderCustomAttachment(sb, attachmentPhysics, attachmentName);
                 }
             } catch (Exception e) {
-                // Silent fallback to atlas rendering
+                BaseMod.logger.info("Exception during attachment render: " + e.getMessage());
             }
         }
 
-        // Fallback: render from atlas
+        // Fallback: render from atlas (won't work for Haberdashery, but keep for other mods)
         if (!rendered) {
             TextureAtlas.AtlasRegion region = atlas.findRegion(attachmentName);
             if (region != null) {
@@ -604,12 +637,85 @@ public class MultiBodyRagdoll {
         }
     }
 
+    private boolean renderCustomAttachment(PolygonSpriteBatch sb, AttachmentPhysics physics, String attachmentName) {
+        try {
+            // Use reflection to get the texture region from custom attachment types
+            Object attachment = physics.attachment;
+
+            // Try to get texture region via common methods
+            java.lang.reflect.Method getRegionMethod = null;
+            try {
+                getRegionMethod = attachment.getClass().getMethod("getRegion");
+            } catch (NoSuchMethodException e) {
+                try {
+                    getRegionMethod = attachment.getClass().getMethod("getTextureRegion");
+                } catch (NoSuchMethodException e2) {
+                    // Try accessing fields directly
+                    java.lang.reflect.Field regionField = null;
+                    try {
+                        regionField = attachment.getClass().getField("region");
+                    } catch (NoSuchFieldException e3) {
+                        try {
+                            regionField = attachment.getClass().getDeclaredField("region");
+                            regionField.setAccessible(true);
+                        } catch (NoSuchFieldException e4) {
+                            return false;
+                        }
+                    }
+                    if (regionField != null) {
+                        Object region = regionField.get(attachment);
+                        if (region instanceof TextureRegion) {
+                            return renderTextureRegion(sb, (TextureRegion) region, physics);
+                        }
+                    }
+                    return false;
+                }
+            }
+
+            if (getRegionMethod != null) {
+                Object region = getRegionMethod.invoke(attachment);
+                if (region instanceof TextureRegion) {
+                    return renderTextureRegion(sb, (TextureRegion) region, physics);
+                }
+            }
+
+        } catch (Exception e) {
+            BaseMod.logger.info("Failed to render custom attachment " + attachmentName + ": " + e.getMessage());
+        }
+
+        return false;
+    }
+
+    private boolean renderTextureRegion(PolygonSpriteBatch sb, TextureRegion region, AttachmentPhysics physics) {
+        float width = region.getRegionWidth() * Settings.scale;
+        float height = region.getRegionHeight() * Settings.scale;
+
+        sb.draw(region,
+                physics.x - width / 2f,
+                physics.y - height / 2f,
+                width / 2f, height / 2f,
+                width, height,
+                1f, 1f, physics.rotation);
+
+        return true;
+    }
+
     private boolean renderRegionAttachment(PolygonSpriteBatch sb, RegionAttachment regionAttachment, AttachmentPhysics physics) {
-        TextureAtlas.AtlasRegion region = (TextureAtlas.AtlasRegion) regionAttachment.getRegion();
+        Object region = regionAttachment.getRegion();
         if (region == null) return false;
 
+        // Handle both AtlasRegion and regular TextureRegion
+        TextureRegion textureRegion;
+        if (region instanceof TextureAtlas.AtlasRegion) {
+            textureRegion = (TextureAtlas.AtlasRegion) region;
+        } else if (region instanceof TextureRegion) {
+            textureRegion = (TextureRegion) region;
+        } else {
+            return false;
+        }
+
         float[] dimensions = AttachmentScaleConfig.calculateRenderDimensions(
-                entityClassName, region.getRegionWidth(), region.getRegionHeight(),
+                entityClassName, textureRegion.getRegionWidth(), textureRegion.getRegionHeight(),
                 physics.originalScaleX, physics.originalScaleY);
 
         float finalWidth = dimensions[0] * Math.abs(regionAttachment.getScaleX());
@@ -619,7 +725,7 @@ public class MultiBodyRagdoll {
         float offsetX = regionAttachment.getX() * regionAttachment.getScaleX() * scaleMultiplier * Settings.scale;
         float offsetY = regionAttachment.getY() * regionAttachment.getScaleY() * scaleMultiplier * Settings.scale;
 
-        sb.draw(region,
+        sb.draw(textureRegion,
                 physics.x - finalWidth / 2f + offsetX,
                 physics.y - finalHeight / 2f + offsetY,
                 finalWidth / 2f, finalHeight / 2f,
@@ -631,20 +737,35 @@ public class MultiBodyRagdoll {
 
     private boolean renderMeshAttachment(PolygonSpriteBatch sb, MeshAttachment meshAttachment,
                                          AttachmentPhysics physics, String attachmentName) {
-        TextureAtlas.AtlasRegion region = (TextureAtlas.AtlasRegion) meshAttachment.getRegion();
+        Object region = meshAttachment.getRegion();
         if (region == null) return false;
 
+        // Handle both AtlasRegion and regular TextureRegion
+        TextureRegion textureRegion;
+        boolean isAtlasRegion = false;
+        if (region instanceof TextureAtlas.AtlasRegion) {
+            textureRegion = (TextureAtlas.AtlasRegion) region;
+            isAtlasRegion = true;
+        } else if (region instanceof TextureRegion) {
+            textureRegion = (TextureRegion) region;
+        } else {
+            return false;
+        }
+
         float[] dimensions = AttachmentScaleConfig.calculateRenderDimensions(
-                entityClassName, region.getRegionWidth(), region.getRegionHeight(),
+                entityClassName, textureRegion.getRegionWidth(), textureRegion.getRegionHeight(),
                 physics.originalScaleX, physics.originalScaleY);
 
         float finalRotation = physics.rotation;
-        if (region.rotate && entityClassName.equals(Sentry.ID) &&
+
+        // Only apply special rotation logic for AtlasRegions
+        if (isAtlasRegion && ((TextureAtlas.AtlasRegion) textureRegion).rotate &&
+                entityClassName.equals(Sentry.ID) &&
                 (attachmentName.contains("top") || attachmentName.contains("bottom"))) {
             finalRotation -= 90f;
         }
 
-        sb.draw(region,
+        sb.draw(textureRegion,
                 physics.x - dimensions[0] / 2f,
                 physics.y - dimensions[1] / 2f,
                 dimensions[0] / 2f, dimensions[1] / 2f,

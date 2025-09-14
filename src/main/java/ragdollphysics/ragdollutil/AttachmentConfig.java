@@ -203,16 +203,49 @@ public class AttachmentConfig {
     }
 
     /**
-     * Check if an attachment should detach, including dismemberment logic based on overkill damage
+     * Check if an attachment is from the Haberdashery mod
      */
-    public static boolean shouldDetachAttachment(String monsterName, String attachmentName, float overkillDamage) {
-        // First check guaranteed attachments
-        if (shouldDetachAttachment(monsterName, attachmentName)) {
+    public static boolean isHaberdasheryAttachment(String attachmentName) {
+        return attachmentName != null && attachmentName.toLowerCase().startsWith("haberdashery");
+    }
+
+    /**
+     * Enhanced shouldDetachAttachment that includes Haberdashery logic
+     */
+    public static boolean shouldDetachAttachment(String entityClassName, String attachmentName, float overkillDamage) {
+        String attachmentLower = attachmentName.toLowerCase();
+
+        // Check for Haberdashery attachments first
+        if (attachmentLower.startsWith("haberdashery")) {
+            BaseMod.logger.info("Found Haberdashery attachment: " + attachmentName + " -> DETACHING");
             return true;
         }
 
-        // Then check chance-based dismemberment
-        return shouldDismember(monsterName, attachmentName, overkillDamage);
+        // Check global attachments
+        for (String globalAttachment : GLOBAL_ATTACHMENTS) {
+            if (attachmentLower.contains(globalAttachment.toLowerCase())) {
+                BaseMod.logger.info("Found global attachment: " + attachmentName + " -> DETACHING");
+                return true;
+            }
+        }
+
+        // Check monster-specific guaranteed attachments
+        String[] attachments = getAttachmentsForMonster(entityClassName);
+        for (String attachment : attachments) {
+            String attachmentTarget = attachment.toLowerCase();
+            if (attachmentLower.equals(attachmentTarget) || attachmentLower.contains(attachmentTarget)) {
+                BaseMod.logger.info("Found monster-specific attachment: " + attachmentName + " -> DETACHING");
+                return true;
+            }
+        }
+
+        // Check dismemberment
+        boolean shouldDismember = shouldDismember(entityClassName, attachmentName, overkillDamage);
+        if (shouldDismember) {
+            BaseMod.logger.info("Dismemberment triggered for: " + attachmentName + " -> DETACHING");
+        }
+
+        return shouldDismember;
     }
 
     // ================================

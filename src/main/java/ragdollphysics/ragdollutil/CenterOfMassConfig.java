@@ -4,6 +4,8 @@ import basemod.BaseMod;
 import com.esotericsoftware.spine.Bone;
 import com.esotericsoftware.spine.Skeleton;
 import com.esotericsoftware.spine.Slot;
+import com.megacrit.cardcrawl.characters.AbstractPlayer;
+import com.megacrit.cardcrawl.characters.Watcher;
 import com.megacrit.cardcrawl.core.Settings;
 import com.megacrit.cardcrawl.monsters.beyond.*;
 import com.megacrit.cardcrawl.monsters.city.*;
@@ -52,6 +54,7 @@ public class CenterOfMassConfig {
         customBodyAttachments.put(GiantHead.ID, new String[]{"head"});
         customBodyAttachments.put(TimeEater.ID, new String[]{"cloak_fg"});
         customBodyAttachments.put(CorruptHeart.ID, new String[]{"cloak_fg"});
+        customBodyAttachments.put("Watcher", new String[]{"robe_upper"});
     }
 
     // ================================

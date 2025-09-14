@@ -9,9 +9,11 @@ import com.evacipated.cardcrawl.modthespire.lib.SpirePrefixPatch;
 import com.evacipated.cardcrawl.modthespire.lib.SpireReturn;
 import com.megacrit.cardcrawl.cards.DamageInfo;
 import com.megacrit.cardcrawl.characters.AbstractPlayer;
+import com.megacrit.cardcrawl.core.AbstractCreature;
 import com.megacrit.cardcrawl.dungeons.AbstractDungeon;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
 import com.megacrit.cardcrawl.screens.DeathScreen;
+import ragdollphysics.actions.PlayerDeathRagdollAction;
 import ragdollphysics.ragdollutil.OverkillTracker;
 import ragdollphysics.ragdollutil.RagdollManager;
 
@@ -83,7 +85,7 @@ public class RagdollPatches {
         @SpirePostfixPatch
         public static void postfix(AbstractPlayer __instance, DamageInfo info) {
             // Only calculate overkill if the player just died from this damage
-            if (__instance.isDead && __instance.currentHealth <= 0) {
+            if (__instance.currentHealth <= 0) {
                 float overkillDamage = OverkillTracker.calculateAndRecordOverkill(__instance);
 
                 if (overkillDamage >= 0) { // Only log if we have valid data
@@ -113,7 +115,7 @@ public class RagdollPatches {
     public static class PlayerUpdatePatch {
         @SpirePostfixPatch
         public static void postfix(AbstractPlayer __instance) {
-            if (__instance.isDead && ragdollManager.hasActivePlayerRagdoll(__instance)) {
+            if (ragdollManager.hasActivePlayerRagdoll(__instance)) {
                 // Update ragdoll physics every frame while dead
                 ragdollManager.updatePlayerRagdollLogic(__instance);
             }
@@ -137,6 +139,30 @@ public class RagdollPatches {
         @SpirePrefixPatch
         public static SpireReturn<Void> prefix(AbstractPlayer __instance) {
             return ragdollManager.handlePlayerDeathAnimation(__instance);
+        }
+    }
+
+    // Add this patch to your RagdollPatches class
+
+    @SpirePatch(clz = AbstractCreature.class, method = "healthBarUpdatedEvent")
+    public static class HealthBarUpdatePatch {
+        @SpirePostfixPatch
+        public static void postfix(AbstractCreature __instance) {
+            // Only trigger for players who just hit 0 health
+            if (__instance instanceof AbstractPlayer) {
+                AbstractPlayer player = (AbstractPlayer) __instance;
+
+                // Check if player just died (health is 0 and they're marked as dead)
+                if (player.currentHealth <= 0) {
+                    BaseMod.logger.info("[HealthBarUpdatePatch] Player health hit 0, queuing ragdoll action");
+
+                    // Add the ragdoll action to the TOP of the action queue
+                    // This will pause all other actions until the ragdoll settles
+                    AbstractDungeon.actionManager.addToTop(
+                            new PlayerDeathRagdollAction(player, ragdollManager)
+                    );
+                }
+            }
         }
     }
 }
