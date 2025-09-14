@@ -1,6 +1,7 @@
 package ragdollphysics.patches;
 
 import basemod.BaseMod;
+import basemod.abstracts.CustomMonster;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.evacipated.cardcrawl.modthespire.lib.SpirePatch;
 import com.evacipated.cardcrawl.modthespire.lib.SpirePostfixPatch;
@@ -24,6 +25,14 @@ public class RagdollPatches {
 
     @SpirePatch(clz = AbstractMonster.class, method = "render")
     public static class RenderPatch {
+        @SpirePrefixPatch
+        public static SpireReturn<Void> prefix(AbstractMonster __instance, SpriteBatch sb) {
+            return ragdollManager.handleRender(__instance, sb);
+        }
+    }
+
+    @SpirePatch(clz = CustomMonster.class, method = "render")
+    public static class CustomMonsterRenderPatch {
         @SpirePrefixPatch
         public static SpireReturn<Void> prefix(AbstractMonster __instance, SpriteBatch sb) {
             return ragdollManager.handleRender(__instance, sb);

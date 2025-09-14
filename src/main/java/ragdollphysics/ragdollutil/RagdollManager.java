@@ -98,6 +98,10 @@ public class RagdollManager {
      * Handles the render patch for AbstractMonster.render()
      */
     public SpireReturn<Void> handleRender(AbstractMonster monster, SpriteBatch sb) {
+
+        BaseMod.logger.info("handleRender called for: " + monster.getClass().getSimpleName() +
+                ", has ragdoll: " + ragdollBodies.containsKey(monster));
+
         if (ragdollBodies.containsKey(monster)) {
             try {
                 renderer.render(monster, sb, ragdollBodies.get(monster), reflectionHelper);
@@ -124,6 +128,10 @@ public class RagdollManager {
         if (ragdoll != null) {
             try {
                 ragdoll.update(Gdx.graphics.getDeltaTime());
+
+                if (ragdoll.isImageBased()) {
+                    ragdoll.applyToImage(monster);
+                }
 
                 handleExploderLogic(monster, ragdoll);
 

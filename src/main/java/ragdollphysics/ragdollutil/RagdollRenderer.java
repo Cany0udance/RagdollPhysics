@@ -110,6 +110,10 @@ public class RagdollRenderer {
     private void renderImageBased(AbstractMonster monster, SpriteBatch sb, MultiBodyRagdoll ragdoll,
                                   ReflectionHelper reflectionHelper) throws Exception {
 
+        BaseMod.logger.info("Rendering image-based ragdoll for " + monster.id +
+                " at (" + ragdoll.getCenterX() + ", " + ragdoll.getCenterY() +
+                ") rotation: " + ragdoll.getAverageRotation());
+
         Texture img = reflectionHelper.getImage(monster);
         if (img == null) {
             return;
