@@ -1,6 +1,8 @@
 package ragdollphysics.ragdollutil;
 
 import basemod.BaseMod;
+import com.megacrit.cardcrawl.characters.AbstractPlayer;
+import com.megacrit.cardcrawl.core.AbstractCreature;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
 import com.megacrit.cardcrawl.monsters.beyond.*;
 import com.megacrit.cardcrawl.monsters.city.*;
@@ -53,87 +55,87 @@ public class PhysicsModifier {
     // ENEMY WEIGHT SYSTEM
     // ================================
 
-    public enum EnemyWeight {
+    public enum EntityWeight {
         LIGHT(1.5f),    // Gets knocked around easily
         MEDIUM(1.0f),   // Baseline behavior
         HEAVY(0.6f);    // Barely budges
 
         public final float modifier;
 
-        EnemyWeight(float modifier) {
+        EntityWeight(float modifier) {
             this.modifier = modifier;
         }
     }
 
-    private static final HashMap<String, EnemyWeight> ENEMY_WEIGHTS = new HashMap<>();
+    private static final HashMap<String, EntityWeight> ENTITY_WEIGHTS = new HashMap<>();
 
     static {
-        // === LIGHT ENEMIES (get knocked around easily) ===
-        ENEMY_WEIGHTS.put(LouseDefensive.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(LouseNormal.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(AcidSlime_S.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(SpikeSlime_S.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(GremlinWarrior.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(GremlinThief.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(GremlinFat.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(GremlinTsundere.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(GremlinWizard.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(Byrd.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(Repulsor.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(Spiker.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(Exploder.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(BronzeOrb.ID, EnemyWeight.LIGHT);
-        ENEMY_WEIGHTS.put(SnakeDagger.ID, EnemyWeight.LIGHT);
+// === LIGHT ENTITIES (get knocked around easily) ===
+        ENTITY_WEIGHTS.put(LouseDefensive.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(LouseNormal.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(AcidSlime_S.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(SpikeSlime_S.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(GremlinWarrior.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(GremlinThief.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(GremlinFat.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(GremlinTsundere.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(GremlinWizard.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(Byrd.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(Repulsor.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(Spiker.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(Exploder.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(BronzeOrb.ID, EntityWeight.LIGHT);
+        ENTITY_WEIGHTS.put(SnakeDagger.ID, EntityWeight.LIGHT);
 
-        // === MEDIUM ENEMIES (baseline behavior) ===
-        ENEMY_WEIGHTS.put(Cultist.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(JawWorm.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(AcidSlime_M.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(SpikeSlime_M.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(FungiBeast.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(SlaverRed.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(SlaverBlue.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(Looter.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(Lagavulin.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(Mugger.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(BanditLeader.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(BanditPointy.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(SphericGuardian.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(Chosen.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(ShelledParasite.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(SnakePlant.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(Snecko.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(Centurion.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(Healer.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(BookOfStabbing.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(GremlinLeader.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(Taskmaster.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(OrbWalker.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(Darkling.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(Reptomancer.ID, EnemyWeight.MEDIUM);
-        ENEMY_WEIGHTS.put(Nemesis.ID, EnemyWeight.MEDIUM);
+        // === MEDIUM ENTITIES (baseline behavior) ===
+        ENTITY_WEIGHTS.put(Cultist.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(JawWorm.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(AcidSlime_M.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(SpikeSlime_M.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(FungiBeast.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(SlaverRed.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(SlaverBlue.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(Looter.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(Lagavulin.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(Mugger.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(BanditLeader.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(BanditPointy.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(SphericGuardian.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(Chosen.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(ShelledParasite.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(SnakePlant.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(Snecko.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(Centurion.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(Healer.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(BookOfStabbing.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(GremlinLeader.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(Taskmaster.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(OrbWalker.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(Darkling.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(Reptomancer.ID, EntityWeight.MEDIUM);
+        ENTITY_WEIGHTS.put(Nemesis.ID, EntityWeight.MEDIUM);
 
-        // === HEAVY ENEMIES (barely budge) ===
-        ENEMY_WEIGHTS.put(SpikeSlime_L.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(AcidSlime_L.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(GremlinNob.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(BanditBear.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(Maw.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(WrithingMass.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(SpireGrowth.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(Transient.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(TheGuardian.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(SlimeBoss.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(Champ.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(BronzeAutomaton.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(GiantHead.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(Donu.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(Deca.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(TimeEater.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(AwakenedOne.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(CorruptHeart.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(SpireSpear.ID, EnemyWeight.HEAVY);
-        ENEMY_WEIGHTS.put(SpireShield.ID, EnemyWeight.HEAVY);
+        // === HEAVY ENTITIES (barely budge) ===
+        ENTITY_WEIGHTS.put(SpikeSlime_L.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(AcidSlime_L.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(GremlinNob.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(BanditBear.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(Maw.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(WrithingMass.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(SpireGrowth.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(Transient.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(TheGuardian.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(SlimeBoss.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(Champ.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(BronzeAutomaton.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(GiantHead.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(Donu.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(Deca.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(TimeEater.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(AwakenedOne.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(CorruptHeart.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(SpireSpear.ID, EntityWeight.HEAVY);
+        ENTITY_WEIGHTS.put(SpireShield.ID, EntityWeight.HEAVY);
     }
 
     // ================================
@@ -165,9 +167,9 @@ public class PhysicsModifier {
     /**
      * Calculate velocity modifiers for a monster based on overkill damage and weight
      */
-    public static VelocityModifiers calculateModifiers(AbstractMonster monster) {
-        float overkillDamage = OverkillTracker.getOverkillDamage(monster);
-        EnemyWeight weight = getWeight(monster);
+    public static VelocityModifiers calculateModifiers(AbstractCreature entity) {
+        float overkillDamage = OverkillTracker.getOverkillDamage(entity);
+        EntityWeight weight = getWeight(entity);
 
         // Calculate base scaling factors from overkill damage
         float horizontalOverkillScale = calculateHorizontalScaling(overkillDamage);
@@ -241,20 +243,27 @@ public class PhysicsModifier {
     /**
      * Get the weight classification for a monster
      */
-    private static EnemyWeight getWeight(AbstractMonster monster) {
-        String monsterID = getMonsterID(monster);
-        return ENEMY_WEIGHTS.getOrDefault(monsterID, EnemyWeight.MEDIUM);
+    private static EntityWeight getWeight(AbstractCreature entity) {
+        String entityID = getEntityID(entity);
+        return ENTITY_WEIGHTS.getOrDefault(entityID, EntityWeight.MEDIUM);
     }
 
     /**
      * Get monster ID using reflection, fallback to class name
      */
-    private static String getMonsterID(AbstractMonster monster) {
+    private static String getEntityID(AbstractCreature entity) {
         try {
-            Field idField = monster.getClass().getField("ID");
-            return (String) idField.get(null);
+            // Try to get monster ID first
+            if (entity instanceof AbstractMonster) {
+                Field idField = entity.getClass().getField("ID");
+                return (String) idField.get(null);
+            } else if (entity instanceof AbstractPlayer) {
+                // For players, use class simple name
+                return entity.getClass().getSimpleName();
+            }
         } catch (Exception e) {
-            return monster.getClass().getSimpleName();
+            // Fallback to class name
         }
+        return entity.getClass().getSimpleName();
     }
 }

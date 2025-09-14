@@ -7,6 +7,7 @@ import com.esotericsoftware.spine.Skeleton;
 import com.esotericsoftware.spine.SkeletonRenderer;
 import com.esotericsoftware.spine.Slot;
 import com.esotericsoftware.spine.attachments.RegionAttachment;
+import com.megacrit.cardcrawl.characters.AbstractPlayer;
 import com.megacrit.cardcrawl.core.Settings;
 import com.megacrit.cardcrawl.dungeons.AbstractDungeon;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
@@ -101,6 +102,39 @@ public class RagdollFactory {
     }
 
     // ================================
+    // PLAYER FACTORY METHOD
+    // ================================
+    /**
+     * Main factory method for players - creates appropriate ragdoll type based on player
+     */
+    public MultiBodyRagdoll createPlayerRagdoll(AbstractPlayer player, ReflectionHelper reflectionHelper) throws Exception {
+        ragdollsCreated++;
+
+        try {
+            MultiBodyRagdoll ragdoll;
+
+            // Determine creation path based on player type
+            if (isImageBasedPlayer(player, reflectionHelper)) {
+                // Check if image physics is enabled
+                if (!ragdollphysics.RagdollPhysics.enableImageRagdolls) {
+                    return null; // Skip creation when image ragdolls disabled
+                }
+                ragdoll = createPlayerImageRagdoll(player);
+            } else {
+                ragdoll = createPlayerSkeletonRagdoll(player, reflectionHelper);
+            }
+
+            // Apply initial physics and setup
+            applyInitialPlayerForce(ragdoll);
+
+            return ragdoll;
+
+        } catch (Exception e) {
+            throw new Exception("Failed to create player ragdoll for " + player.getClass().getSimpleName() + ": " + e.getMessage(), e);
+        }
+    }
+
+    // ================================
     // RAGDOLL CREATION METHODS
     // ================================
 
@@ -173,6 +207,63 @@ public class RagdollFactory {
     }
 
     // ================================
+    // PLAYER RAGDOLL CREATION METHODS
+    // ================================
+    /**
+     * Create ragdoll for image-based players
+     */
+    private MultiBodyRagdoll createPlayerImageRagdoll(AbstractPlayer player) throws Exception {
+        try {
+            float customGroundLevel = calculatePlayerGroundLevel(player);
+
+            return new MultiBodyRagdoll(
+                    player.drawX,
+                    player.drawY,
+                    customGroundLevel,
+                    player.getClass().getSimpleName(), // Use class name as ID for players
+                    player
+            );
+
+        } catch (Exception e) {
+            throw new Exception("Failed to create player image ragdoll: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Create ragdoll for skeleton-based players (normal case)
+     */
+    private MultiBodyRagdoll createPlayerSkeletonRagdoll(AbstractPlayer player, ReflectionHelper reflectionHelper) throws Exception {
+        try {
+            // Get skeleton components
+            Skeleton skeleton = reflectionHelper.getSkeleton(player);
+            SkeletonRenderer sr = reflectionHelper.getSkeletonRenderer(player);
+
+            validateSkeletonComponents(skeleton, sr);
+
+            float customGroundLevel = calculatePlayerGroundLevel(player);
+
+            // Create the ragdoll with skeleton
+            MultiBodyRagdoll ragdoll = new MultiBodyRagdoll(
+                    skeleton,
+                    customGroundLevel,
+                    player.drawX,
+                    player.drawY,
+                    player.getClass().getSimpleName(), // Use class name as ID for players
+                    player
+            );
+
+            // Initialize bone wobbles with hierarchy awareness
+            initializePlayerHierarchicalBoneWobbles(ragdoll, skeleton, player);
+
+            return ragdoll;
+
+        } catch (Exception e) {
+            throw new Exception("Failed to create player skeleton ragdoll: " + e.getMessage(), e);
+        }
+    }
+
+
+    // ================================
     // BONE WOBBLE INITIALIZATION
     // ================================
 
@@ -231,6 +322,54 @@ public class RagdollFactory {
             float multiplier = MathUtils.random(CONTROL_BONE_MULTIPLIER_MIN, CONTROL_BONE_MULTIPLIER_MAX);
             wobble.angularVelocity *= multiplier * (1.0f - depthReduction * CONTROL_BONE_DEPTH_IMPACT);
         }
+    }
+    // ================================
+    // PLAYER BONE WOBBLE INITIALIZATION
+    // ================================
+    /**
+     * Initialize bone wobbles for players with hierarchy-aware physics
+     */
+    private void initializePlayerHierarchicalBoneWobbles(MultiBodyRagdoll ragdoll, Skeleton skeleton, AbstractPlayer player) {
+        float overkillDamage = OverkillTracker.getOverkillDamage(player);
+        String playerName = player.getClass().getSimpleName();
+
+        for (Bone bone : skeleton.getBones()) {
+            BoneWobble wobble = new BoneWobble(bone.getRotation(), bone);
+
+            // Apply depth-based reduction
+            float depthReduction = Math.min(wobble.chainDepth * CHAIN_DEPTH_REDUCTION_FACTOR, MAX_DEPTH_REDUCTION);
+            wobble.angularVelocity = MathUtils.random(-360f, 360f) * (1.0f - depthReduction);
+
+            // Determine bone characteristics
+            boolean hasVisualAttachment = hasVisualAttachment(bone);
+            boolean willBeDetached = willPlayerBoneBeDetached(bone, skeleton, playerName, overkillDamage);
+            boolean isVisualLimb = hasVisualAttachment && isLimbBone(bone);
+
+            // Apply appropriate physics enhancement
+            applyBoneEnhancement(wobble, willBeDetached, isVisualLimb, hasVisualAttachment, depthReduction);
+
+            // Apply minimal random initial rotation offset
+            wobble.rotation += MathUtils.random(-2f, 2f);
+
+            // Store the wobble in the ragdoll
+            ragdoll.boneWobbles.put(bone, wobble);
+        }
+    }
+
+    /**
+     * Check if a player bone will have its attachment detached for physics
+     */
+    private boolean willPlayerBoneBeDetached(Bone bone, Skeleton skeleton, String playerName, float overkillDamage) {
+        for (Slot slot : skeleton.getSlots()) {
+            if (slot.getBone() == bone && slot.getAttachment() instanceof RegionAttachment) {
+                RegionAttachment regionAttachment = (RegionAttachment) slot.getAttachment();
+                String attachmentName = regionAttachment.getName();
+                if (AttachmentConfig.shouldDetachAttachment(playerName, attachmentName, overkillDamage)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     // ================================
@@ -306,7 +445,7 @@ public class RagdollFactory {
 
         // Determine direction based on monster position relative to player
         float playerX = AbstractDungeon.player.drawX;
-        float monsterX = ragdoll.getAssociatedMonster().drawX;
+        float monsterX = ragdoll.getAssociatedEntity().drawX;
         float forceX = (monsterX < playerX) ? -baseForceX : baseForceX;
 
         ragdoll.applyGlobalForce(forceX, forceY);
@@ -323,6 +462,46 @@ public class RagdollFactory {
         try {
             return reflectionHelper.getImage(monster) != null &&
                     reflectionHelper.getSkeleton(monster) == null;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // ================================
+    // PLAYER HELPER METHODS
+    // ================================
+    /**
+     * Calculate ground level for players
+     */
+    private float calculatePlayerGroundLevel(AbstractPlayer player) {
+        // Players typically stay at floor level
+        return AbstractDungeon.floorY + (20f * Settings.scale);
+    }
+
+    /**
+     * Apply initial physics force to the player ragdoll
+     */
+    private void applyInitialPlayerForce(MultiBodyRagdoll ragdoll) {
+        float baseForceX = MathUtils.random(MIN_FORCE_X, MAX_FORCE_X);
+        float forceY = MathUtils.random(MIN_FORCE_Y, MAX_FORCE_Y);
+
+        // Players can fall in either direction - no monster position reference
+        float forceX = MathUtils.randomBoolean() ? baseForceX : -baseForceX;
+
+        ragdoll.applyGlobalForce(forceX, forceY);
+
+        // Initialize rotation tracking
+        ragdoll.lastRotation = ragdoll.mainBody.rotation;
+        ragdoll.totalRotationDegrees = 0f;
+    }
+
+    /**
+     * Check if player is image-based (has image but no skeleton)
+     */
+    private boolean isImageBasedPlayer(AbstractPlayer player, ReflectionHelper reflectionHelper) {
+        try {
+            return reflectionHelper.getImage(player) != null &&
+                    reflectionHelper.getSkeleton(player) == null;
         } catch (Exception e) {
             return false;
         }

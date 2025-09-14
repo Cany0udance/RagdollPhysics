@@ -13,17 +13,16 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
- * Encapsulates all reflection operations for accessing monster internals.
- * Centralizes field access and provides clean interface for monster data.
+ * Encapsulates all reflection operations for accessing creature internals.
+ * Centralizes field access and provides clean interface for monster and player data.
  */
 public class ReflectionHelper {
-    // Reflection fields for accessing monster internals
+    // Reflection fields for accessing creature internals
     private static Field atlasField;
     private static Field imgField;
     private static Field skeletonField;
     private static Field srField;
     private static Method renderNameMethod;
-
     // Initialization status
     private static boolean fieldsInitialized = false;
 
@@ -39,6 +38,7 @@ public class ReflectionHelper {
             atlasField = AbstractCreature.class.getDeclaredField("atlas");
             atlasField.setAccessible(true);
 
+            // img field is in AbstractMonster, not AbstractCreature
             imgField = AbstractMonster.class.getDeclaredField("img");
             imgField.setAccessible(true);
 
@@ -53,7 +53,6 @@ public class ReflectionHelper {
 
             fieldsInitialized = true;
             BaseMod.logger.info("ReflectionHelper fields initialized successfully");
-
         } catch (Exception e) {
             fieldsInitialized = false;
             BaseMod.logger.error("Failed to initialize ReflectionHelper fields: " + e.getMessage());
@@ -68,46 +67,61 @@ public class ReflectionHelper {
         return fieldsInitialized;
     }
 
+    // ================================
+    // GENERIC CREATURE METHODS
+    // ================================
     /**
-     * Get monster's texture atlas
+     * Get creature's texture atlas
      */
-    public TextureAtlas getAtlas(AbstractMonster monster) throws IllegalAccessException {
+    public TextureAtlas getAtlas(AbstractCreature creature) throws IllegalAccessException {
         if (atlasField == null) {
             throw new IllegalAccessException("atlasField not initialized");
         }
-        return (TextureAtlas) atlasField.get(monster);
+        return (TextureAtlas) atlasField.get(creature);
     }
 
     /**
-     * Get monster's image texture
+     * Get creature's image texture
+     * Note: This only works for AbstractMonster instances since img field is in AbstractMonster
      */
-    public Texture getImage(AbstractMonster monster) throws IllegalAccessException {
+    public Texture getImage(AbstractCreature creature) throws IllegalAccessException {
         if (imgField == null) {
             throw new IllegalAccessException("imgField not initialized");
         }
-        return (Texture) imgField.get(monster);
+        // Only works for monsters since img field is in AbstractMonster
+        if (!(creature instanceof AbstractMonster)) {
+            return null; // or throw exception if you prefer
+        }
+        return (Texture) imgField.get(creature);
     }
 
     /**
-     * Get monster's skeleton
+     * Get creature's skeleton
      */
-    public Skeleton getSkeleton(AbstractMonster monster) throws IllegalAccessException {
+    public Skeleton getSkeleton(AbstractCreature creature) throws IllegalAccessException {
+        BaseMod.logger.info("[ReflectionHelper] getSkeleton called for " + creature.getClass().getSimpleName());
         if (skeletonField == null) {
+            BaseMod.logger.info("[ReflectionHelper] ERROR: skeletonField not initialized");
             throw new IllegalAccessException("skeletonField not initialized");
         }
-        return (Skeleton) skeletonField.get(monster);
+        Skeleton result = (Skeleton) skeletonField.get(creature);
+        BaseMod.logger.info("[ReflectionHelper] Retrieved skeleton: " + (result != null ? "present" : "null"));
+        return result;
     }
 
     /**
-     * Get monster's skeleton renderer
+     * Get creature's skeleton renderer
      */
-    public SkeletonRenderer getSkeletonRenderer(AbstractMonster monster) throws IllegalAccessException {
+    public SkeletonRenderer getSkeletonRenderer(AbstractCreature creature) throws IllegalAccessException {
         if (srField == null) {
             throw new IllegalAccessException("srField not initialized");
         }
-        return (SkeletonRenderer) srField.get(monster);
+        return (SkeletonRenderer) srField.get(creature);
     }
 
+    // ================================
+    // MONSTER-SPECIFIC METHODS
+    // ================================
     /**
      * Render monster's name using reflection
      */

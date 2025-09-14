@@ -75,7 +75,7 @@ public class BoneWobble {
     private final boolean isLongLimb;
 
     // Locking mechanism
-    private boolean isLocked = false;
+    public boolean isLocked = false;
     private float timeSettled = 0f;
     private boolean wasRecentlyUnlocked = false;
     private float lastSignificantMovement = 0f;
@@ -271,7 +271,7 @@ public class BoneWobble {
     }
 
     private boolean shouldAllowFreeRotation(MultiBodyRagdoll ragdoll) {
-        String monsterClassName = ragdoll.getMonsterClassName();
+        String monsterClassName = ragdoll.getEntityClassName();
         String boneName = bone.getData().getName().toLowerCase();
 
         if (!FREE_ROTATION_ENEMIES.contains(monsterClassName)) {

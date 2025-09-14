@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.esotericsoftware.spine.Bone;
 import com.esotericsoftware.spine.Skeleton;
+import com.megacrit.cardcrawl.core.AbstractCreature;
 import com.megacrit.cardcrawl.core.Settings;
 import com.megacrit.cardcrawl.helpers.ImageMaster;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
@@ -26,7 +27,7 @@ public class RagdollDebugRenderer {
      * Color legend:
      * RED: Physics center (where physics simulation happens)
      * MAGENTA: Expected visual center (where we're trying to position the skeleton)
-     * ORANGE: Monster's drawX/drawY position
+     * ORANGE: Entity's drawX/drawY position
      * LIME: Actual skeleton position (skeleton.getX/Y)
      * CYAN: "body" bone world position (the actual visual body center)
      * YELLOW: Detached attachment physics bodies
@@ -61,17 +62,17 @@ public class RagdollDebugRenderer {
                 visualCenterY - squareSize/2f,
                 squareSize, squareSize);
 
-        // 3. Monster drawX/drawY (ORANGE) - Always show this as baseline
-        AbstractMonster monster = ragdoll.getAssociatedMonster();
+        // 3. Entity drawX/drawY (ORANGE) - Always show this as baseline
+        AbstractCreature entity = ragdoll.getAssociatedEntity();
         sb.setColor(Color.ORANGE);
         sb.draw(debugSquareTexture,
-                monster.drawX - squareSize/2f,
-                monster.drawY - squareSize/2f,
+                entity.drawX - squareSize/2f,
+                entity.drawY - squareSize/2f,
                 squareSize, squareSize);
 
         // 4. Try to find and show skeleton position (LIME GREEN)
-        if (!ragdoll.isImageBased() && monster != null) {
-            renderSkeletonDebugInfo(sb, squareSize, ragdoll, monster);
+        if (!ragdoll.isImageBased() && entity != null) {
+            renderSkeletonDebugInfo(sb, squareSize, ragdoll, entity);
         }
 
         // 5. Attachment physics bodies (YELLOW)
@@ -93,26 +94,26 @@ public class RagdollDebugRenderer {
         sb.setColor(originalColor);
     }
 
-    private static void renderSkeletonDebugInfo(SpriteBatch sb, float squareSize, MultiBodyRagdoll ragdoll, AbstractMonster monster) {
+    private static void renderSkeletonDebugInfo(SpriteBatch sb, float squareSize, MultiBodyRagdoll ragdoll, AbstractCreature entity) {
         // COMPREHENSIVE field search with detailed logging
-        Class<?> monsterClass = monster.getClass();
-        String monsterClassName = monsterClass.getSimpleName();
+        Class<?> entityClass = entity.getClass();
+        String entityClassName = entityClass.getSimpleName();
 
         // Log every few seconds for debugging
         if (ragdoll.getUpdateCount() % 180 == 0 && printFieldLogs) {
             BaseMod.logger.info("[" + ragdoll.getRagdollId() + "] === SKELETON SEARCH DEBUG ===");
-            BaseMod.logger.info("[" + ragdoll.getRagdollId() + "] Monster class: " + monsterClassName);
+            BaseMod.logger.info("[" + ragdoll.getRagdollId() + "] Entity class: " + entityClassName);
             BaseMod.logger.info("[" + ragdoll.getRagdollId() + "] Searching for skeleton field...");
 
-            // List ALL fields in the monster class
-            java.lang.reflect.Field[] allFields = monsterClass.getDeclaredFields();
-            BaseMod.logger.info("[" + ragdoll.getRagdollId() + "] Monster has " + allFields.length + " fields:");
+            // List ALL fields in the entity class
+            java.lang.reflect.Field[] allFields = entityClass.getDeclaredFields();
+            BaseMod.logger.info("[" + ragdoll.getRagdollId() + "] Entity has " + allFields.length + " fields:");
             for (java.lang.reflect.Field field : allFields) {
                 BaseMod.logger.info("[" + ragdoll.getRagdollId() + "] - Field: " + field.getName() + " (type: " + field.getType().getSimpleName() + ")");
             }
 
             // Also check parent classes
-            Class<?> parentClass = monsterClass.getSuperclass();
+            Class<?> parentClass = entityClass.getSuperclass();
             while (parentClass != null && !parentClass.equals(Object.class)) {
                 java.lang.reflect.Field[] parentFields = parentClass.getDeclaredFields();
                 BaseMod.logger.info("[" + ragdoll.getRagdollId() + "] Parent class " + parentClass.getSimpleName() + " has " + parentFields.length + " fields:");
@@ -124,7 +125,7 @@ public class RagdollDebugRenderer {
         }
 
         // Try to find skeleton field
-        Skeleton foundSkeleton = findSkeletonField(monster);
+        Skeleton foundSkeleton = findSkeletonField(entity);
         String foundFieldName = null;
 
         if (foundSkeleton != null) {
@@ -139,14 +140,14 @@ public class RagdollDebugRenderer {
 
             // Find and show the "body" bone position (CYAN)
             renderBodyBoneDebugInfo(sb, squareSize, foundSkeleton, ragdoll);
-
         } else if (ragdoll.getUpdateCount() % 180 == 0 && printFieldLogs) {
-            BaseMod.logger.warn("[" + ragdoll.getRagdollId() + "] NO SKELETON FIELD FOUND in " + monsterClassName + " or its parent classes!");
+            BaseMod.logger.warn("[" + ragdoll.getRagdollId() + "] NO SKELETON FIELD FOUND in " + entityClassName + " or its parent classes!");
         }
     }
 
     private static void renderBodyBoneDebugInfo(SpriteBatch sb, float squareSize, Skeleton skeleton, MultiBodyRagdoll ragdoll) {
         Bone bodyBone = skeleton.findBone("body");
+
         if (bodyBone != null) {
             sb.setColor(Color.CYAN);
             float bodyX = skeleton.getX() + bodyBone.getWorldX() * Settings.scale;
@@ -193,16 +194,14 @@ public class RagdollDebugRenderer {
         }
     }
 
-    private static Skeleton findSkeletonField(AbstractMonster monster) {
-        Class<?> searchClass = monster.getClass();
+    private static Skeleton findSkeletonField(AbstractCreature entity) {
+        Class<?> searchClass = entity.getClass();
         while (searchClass != null) {
             java.lang.reflect.Field[] fields = searchClass.getDeclaredFields();
-
             for (java.lang.reflect.Field field : fields) {
                 try {
                     field.setAccessible(true);
-                    Object fieldValue = field.get(monster);
-
+                    Object fieldValue = field.get(entity);
                     if (fieldValue instanceof Skeleton) {
                         return (Skeleton) fieldValue;
                     }
@@ -210,7 +209,6 @@ public class RagdollDebugRenderer {
                     // Ignore and continue
                 }
             }
-
             searchClass = searchClass.getSuperclass();
         }
         return null;

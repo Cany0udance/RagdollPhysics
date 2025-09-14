@@ -6,10 +6,13 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.esotericsoftware.spine.Skeleton;
 import com.esotericsoftware.spine.SkeletonRenderer;
+import com.megacrit.cardcrawl.characters.AbstractPlayer;
 import com.megacrit.cardcrawl.core.CardCrawlGame;
 import com.megacrit.cardcrawl.core.Settings;
 import com.megacrit.cardcrawl.dungeons.AbstractDungeon;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
+import com.megacrit.cardcrawl.rooms.AbstractRoom;
+import com.megacrit.cardcrawl.rooms.MonsterRoom;
 
 /**
  * Handles all ragdoll rendering operations.
@@ -56,6 +59,63 @@ public class RagdollRenderer {
         }
     }
 
+    // ================================
+    // PLAYER RENDERING ENTRY POINTS
+    // ================================
+    /**
+     * Main render method for players - handles both skeleton and image-based ragdolls
+     */
+    public void renderPlayer(AbstractPlayer player, SpriteBatch sb, MultiBodyRagdoll ragdoll,
+                             ReflectionHelper reflectionHelper) throws Exception {
+        // Skip rendering if player has completely faded out
+        if (player.tint.color.a <= 0) {
+            return;
+        }
+
+        try {
+            // Determine rendering path based on player type
+            TextureAtlas atlas = reflectionHelper.getAtlas(player);
+            if (atlas == null) {
+                renderPlayerImageBased(player, sb, ragdoll, reflectionHelper);
+            } else {
+                renderPlayerSkeletonBased(player, sb, ragdoll, reflectionHelper, atlas);
+            }
+
+            // Render health bar if in combat
+            if (AbstractDungeon.getCurrRoom().phase == AbstractRoom.RoomPhase.COMBAT ||
+                    AbstractDungeon.getCurrRoom() instanceof MonsterRoom) {
+                player.renderHealth(sb);
+            }
+
+        } catch (Exception e) {
+            throw e;
+        }
+    }
+
+    /**
+     * Render method specifically for player image rendering
+     */
+    public void renderPlayerImage(AbstractPlayer player, SpriteBatch sb, MultiBodyRagdoll ragdoll,
+                                  ReflectionHelper reflectionHelper) throws Exception {
+        // Skip rendering if player has completely faded out
+        if (player.tint.color.a <= 0) {
+            return;
+        }
+
+        try {
+            // Check if we have a skeleton to render
+            TextureAtlas atlas = reflectionHelper.getAtlas(player);
+            if (atlas != null) {
+                renderPlayerSkeletonOnly(player, sb, ragdoll, reflectionHelper, atlas);
+            } else {
+                renderPlayerImageBased(player, sb, ragdoll, reflectionHelper);
+            }
+        } catch (Exception e) {
+            throw e;
+        }
+    }
+
+
 
     // ================================
     // SKELETON-BASED RENDERING
@@ -85,6 +145,79 @@ public class RagdollRenderer {
         // Render skeleton and detached attachments
         sr.draw(CardCrawlGame.psb, skeleton);
         ragdoll.renderDetachedAttachments(CardCrawlGame.psb, atlas, monster);
+
+        // Switch back to normal sprite batch
+        CardCrawlGame.psb.end();
+        sb.begin();
+        sb.setBlendFunction(770, 771); // Reset blend function
+
+        // Render debug visualization
+        RagdollDebugRenderer.renderDebugSquares(sb, ragdoll);
+    }
+
+    // ================================
+    // PLAYER SKELETON-BASED RENDERING
+    // ================================
+    /** Render players with Spine skeleton animations */
+    private void renderPlayerSkeletonBased(AbstractPlayer player, SpriteBatch sb, MultiBodyRagdoll ragdoll,
+                                           ReflectionHelper reflectionHelper, TextureAtlas atlas) throws Exception {
+        Skeleton skeleton = reflectionHelper.getSkeleton(player);
+        SkeletonRenderer sr = reflectionHelper.getSkeletonRenderer(player);
+
+        if (skeleton == null || sr == null) {
+            return;
+        }
+
+        // Apply ragdoll physics to skeleton bones and update transforms
+        ragdoll.applyToBones(skeleton, player);
+        skeleton.updateWorldTransform();
+
+        // Apply player visual properties
+        skeleton.setColor(player.tint.color);
+        skeleton.setFlip(player.flipHorizontal, player.flipVertical);
+
+        // Switch to polygon sprite batch for skeleton rendering
+        sb.end();
+        CardCrawlGame.psb.begin();
+
+        // Render skeleton and detached attachments
+        sr.draw(CardCrawlGame.psb, skeleton);
+        ragdoll.renderDetachedAttachments(CardCrawlGame.psb, atlas, player);
+
+        // Switch back to normal sprite batch
+        CardCrawlGame.psb.end();
+        sb.begin();
+        sb.setBlendFunction(770, 771); // Reset blend function
+
+        // Render debug visualization
+        RagdollDebugRenderer.renderDebugSquares(sb, ragdoll);
+    }
+
+    /** Render only the skeleton part (for renderPlayerImage patch) */
+    private void renderPlayerSkeletonOnly(AbstractPlayer player, SpriteBatch sb, MultiBodyRagdoll ragdoll,
+                                          ReflectionHelper reflectionHelper, TextureAtlas atlas) throws Exception {
+        Skeleton skeleton = reflectionHelper.getSkeleton(player);
+        SkeletonRenderer sr = reflectionHelper.getSkeletonRenderer(player);
+
+        if (skeleton == null || sr == null) {
+            return;
+        }
+
+        // Apply ragdoll physics to skeleton bones and update transforms
+        ragdoll.applyToBones(skeleton, player);
+        skeleton.updateWorldTransform();
+
+        // Apply player visual properties
+        skeleton.setColor(player.tint.color);
+        skeleton.setFlip(player.flipHorizontal, player.flipVertical);
+
+        // Switch to polygon sprite batch for skeleton rendering
+        sb.end();
+        CardCrawlGame.psb.begin();
+
+        // Render skeleton and detached attachments
+        sr.draw(CardCrawlGame.psb, skeleton);
+        ragdoll.renderDetachedAttachments(CardCrawlGame.psb, atlas, player);
 
         // Switch back to normal sprite batch
         CardCrawlGame.psb.end();
@@ -132,6 +265,46 @@ public class RagdollRenderer {
                 img.getWidth(), img.getHeight(),      // source width, height
                 monster.flipHorizontal,               // flip X
                 monster.flipVertical);                // flip Y
+
+        // Render debug visualization
+        RagdollDebugRenderer.renderDebugSquares(sb, ragdoll);
+    }
+
+    // ================================
+    // PLAYER IMAGE-BASED RENDERING
+    // ================================
+    /** Render players using static images */
+    private void renderPlayerImageBased(AbstractPlayer player, SpriteBatch sb, MultiBodyRagdoll ragdoll,
+                                        ReflectionHelper reflectionHelper) throws Exception {
+        Texture img = reflectionHelper.getImage(player);
+        if (img == null) {
+            return;
+        }
+
+        // Set player tint and get physics state
+        sb.setColor(player.tint.color);
+        float centerX = ragdoll.getCenterX();
+        float centerY = ragdoll.getCenterY();
+        float rotation = ragdoll.getAverageRotation();
+
+        // Calculate image center for proper rotation
+        float imgCenterX = img.getWidth() * Settings.scale / 2.0f;
+        float imgCenterY = img.getHeight() * Settings.scale / 2.0f;
+
+        // Render image with physics-based transformation
+        sb.draw(img,
+                centerX - imgCenterX,                  // x
+                centerY - imgCenterY,                  // y
+                imgCenterX,                            // origin X
+                imgCenterY,                            // origin Y
+                img.getWidth() * Settings.scale,       // width
+                img.getHeight() * Settings.scale,      // height
+                1f, 1f,                               // scale X, Y
+                rotation,                             // rotation
+                0, 0,                                 // source X, Y
+                img.getWidth(), img.getHeight(),      // source width, height
+                player.flipHorizontal,               // flip X
+                player.flipVertical);                // flip Y
 
         // Render debug visualization
         RagdollDebugRenderer.renderDebugSquares(sb, ragdoll);
