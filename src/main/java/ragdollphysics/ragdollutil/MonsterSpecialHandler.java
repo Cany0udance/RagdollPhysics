@@ -22,10 +22,8 @@ public class MonsterSpecialHandler {
      */
     public void handleSpecialComponents(AbstractMonster monster) {
         String monsterClass = monster.getClass().getSimpleName();
-        BaseMod.logger.info("[" + handlerId + "] Checking for special handling for monster: " + monsterClass);
 
         if (monsterClass.equals("Hexaghost")) {
-            BaseMod.logger.info("[" + handlerId + "] Applying Hexaghost special handling");
             handleHexaghostSpecialComponents(monster);
         }
         // Add other special cases here as needed
@@ -53,15 +51,10 @@ public class MonsterSpecialHandler {
                         Method hideMethod = orb.getClass().getMethod("hide");
                         hideMethod.invoke(orb);
 
-                        BaseMod.logger.info("[" + handlerId + "] Deactivated and hidden Hexaghost orb");
                     } catch (Exception e) {
-                        BaseMod.logger.info("[" + handlerId + "] Could not deactivate/hide Hexaghost orb: " + e.getMessage());
                     }
                 }
             }
-
-            // Let the body fade naturally - don't dispose it immediately
-            BaseMod.logger.info("[" + handlerId + "] Hexaghost orbs deactivated, body will fade naturally");
 
         } catch (Exception e) {
             BaseMod.logger.info("[" + handlerId + "] Could not handle Hexaghost special components: " + e.getMessage());

@@ -15,34 +15,25 @@ import static ragdollphysics.ragdollutil.MultiBodyRagdoll.printInitializationLog
  * Provides hierarchy-aware bone movement with gravitational effects for limbs.
  */
 public class BoneWobble {
-    public float rotation = 0f;
-    public float angularVelocity = 0f;
-    private final String wobbleId;
-    private int updateCount = 0;
-    private float timeAlive = 0f;
-    private final Bone bone;
 
-    // PUBLIC: Hierarchical constraint properties (accessible from outside)
-    public final boolean isRootBone;
-    public final boolean isLeafBone;
-    public final int chainDepth;
-    public final float baseRotationConstraint;
-    public final float parentInfluence;
+    // ================================
+    // CORE PHYSICS CONSTANTS
+    // ================================
 
-    // Limb gravity properties
-    private final boolean isLimb;
-    private final boolean isLongLimb;
-    private final float originalRotation;
-    private boolean hasAppliedGravityCorrection = false;
-    private float gravityTimer = 0f;
     private static final float GRAVITY_CORRECTION_DELAY = 1.0f;
+    private static final float AIRBORNE_VELOCITY_THRESHOLD = 30f;
+    private static final float AIRBORNE_MAGNITUDE_THRESHOLD = 150f;
+    private static final float GROUND_CONTACT_TOLERANCE = 5f;
+    private static final float LIMB_SETTLING_TIME = 0.5f;
+    private static final float SIGNIFICANT_VELOCITY = 10f;
+    private static final float SIGNIFICANT_ROTATION = 5f;
+    private static final float VELOCITY_DEADZONE = 0.1f;
+    private static final float SETTLED_VELOCITY_THRESHOLD = 2f;
+    private static final float CONSTRAINT_VIOLATION_THRESHOLD = 0.2f;
 
-    // Locking mechanism for settled bones
-    private boolean isLocked = false;
-    private float timeSettled = 0f;
-    private boolean wasRecentlyUnlocked = false;
-    private float lastSignificantMovement = 0f;
-    private boolean hasLoggedLocking = false;
+    // ================================
+    // ENEMY CONFIGURATION
+    // ================================
 
     private static final Set<String> FREE_ROTATION_ENEMIES = new HashSet<>();
     static {
@@ -55,10 +46,54 @@ public class BoneWobble {
         FREE_ROTATION_ENEMIES.add(SpikeSlime_M.ID);
     }
 
+    // ================================
+    // PHYSICS STATE
+    // ================================
+
+    public float rotation = 0f;
+    public float angularVelocity = 0f;
+    private final float originalRotation;
+
+    // ================================
+    // BONE PROPERTIES
+    // ================================
+
+    private final Bone bone;
+    private final String wobbleId;
+    private int updateCount = 0;
+    private float timeAlive = 0f;
+
+    // Hierarchy properties
+    public final boolean isRootBone;
+    public final boolean isLeafBone;
+    public final int chainDepth;
+    public final float baseRotationConstraint;
+    public final float parentInfluence;
+
+    // Limb properties
+    private final boolean isLimb;
+    private final boolean isLongLimb;
+
+    // Locking mechanism
+    private boolean isLocked = false;
+    private float timeSettled = 0f;
+    private boolean wasRecentlyUnlocked = false;
+    private float lastSignificantMovement = 0f;
+    private boolean hasLoggedLocking = false;
+
+    // Limb gravity state
+    private boolean hasAppliedGravityCorrection = false;
+    private float gravityTimer = 0f;
+
+    // ================================
+    // CONSTRUCTOR
+    // ================================
+
     public BoneWobble(float initialRotation, Bone bone) {
         this.originalRotation = initialRotation;
         this.bone = bone;
         this.wobbleId = "Wobble_" + System.currentTimeMillis() % 1000;
+
         String boneName = bone.getData().getName().toLowerCase();
         boolean hasVisualAttachment = boneHasVisualAttachment(bone);
 
@@ -67,89 +102,32 @@ public class BoneWobble {
         this.isLeafBone = bone.getChildren().size == 0;
         this.chainDepth = calculateChainDepth(bone);
 
-        // FIXED: More reasonable constraint values
+        // Configure constraints - more reasonable values
         if (hasVisualAttachment) {
-            // Visual bones get more freedom
             this.baseRotationConstraint = isRootBone ? 60f : Math.max(25f, 45f - chainDepth * 2f);
-            this.parentInfluence = 0.2f; // Reduced parent influence
+            this.parentInfluence = 0.2f;
         } else {
-            // Control bones still get constraints but not so restrictive
             this.baseRotationConstraint = isRootBone ? 45f : Math.max(12f, 25f - chainDepth * 1f);
-            this.parentInfluence = 0.4f; // Reduced parent influence for control bones too
+            this.parentInfluence = 0.4f;
         }
 
         this.isLimb = hasVisualAttachment && isAnatomicalLimbName(boneName);
         this.isLongLimb = this.isLimb;
     }
 
-    private boolean shouldAllowFreeRotation(MultiBodyRagdoll ragdoll) {
-        String monsterClassName = ragdoll.getMonsterClassName();
-        String boneName = bone.getData().getName().toLowerCase();
-
-        // Check if this is a free rotation enemy
-        if (!FREE_ROTATION_ENEMIES.contains(monsterClassName)) {
-            return false; // Not a free rotation enemy, use normal constraints
-        }
-
-        // For Louse enemies specifically, constrain antler bones
-        if ((monsterClassName.equals(LouseNormal.ID) || monsterClassName.equals(LouseDefensive.ID))
-                && boneName.contains("ant")) {
-            return false; // Constrain antlers on Louse
-        }
-
-        // Other bones on free rotation enemies get free rotation
-        return true;
-    }
-
-    // Calculate how deep this bone is in its chain
-    private int calculateChainDepth(Bone bone) {
-        int depth = 0;
-        Bone current = bone;
-        while (current.getParent() != null) {
-            current = current.getParent();
-            depth++;
-        }
-        return depth;
-    }
-
-    // Get the parent bone's wobble rotation if it exists
-    private float getParentWobbleRotation(MultiBodyRagdoll ragdoll) {
-        if (bone.getParent() != null) {
-            BoneWobble parentWobble = ragdoll.boneWobbles.get(bone.getParent());
-            if (parentWobble != null) {
-                return parentWobble.rotation;
-            }
-        }
-        return 0f;
-    }
-
-    // Check if a bone actually has a visual sprite attachment
-    private boolean boneHasVisualAttachment(Bone bone) {
-        try {
-            for (Slot slot : bone.getSkeleton().getSlots()) {
-                if (slot.getBone() == bone && slot.getAttachment() != null) {
-                    return true;
-                }
-            }
-        } catch (Exception e) {
-            return true; // Default to visual if we can't determine
-        }
-        return false;
-    }
-
-    // Much simpler anatomical limb detection
-    private boolean isAnatomicalLimbName(String boneName) {
-        return boneName.matches("^(arm|leg|wing)(_bg|_fg|l|r|left|right)?$");
-    }
+    // ================================
+    // MAIN UPDATE METHOD
+    // ================================
 
     public void update(float deltaTime, float parentVelocityX, float parentVelocityY,
                        boolean parentHasSettled, MultiBodyRagdoll ragdoll) {
+
         updateCount++;
         timeAlive += deltaTime;
         float oldAngularVelocity = angularVelocity;
         float oldRotation = rotation;
 
-        // Track time since parent settled
+        // === SETTLING AND LOCKING LOGIC ===
         if (parentHasSettled) {
             timeSettled += deltaTime;
         } else {
@@ -160,8 +138,7 @@ public class BoneWobble {
             }
         }
 
-        // Lock bones when parent has fully settled - be more aggressive about locking
-        // Important comment: The following block makes it so limbs lock entirely when the ragdoll is settled.
+        // Lock bones when parent has fully settled
         if (parentHasSettled && !isLocked) {
             isLocked = true;
             angularVelocity = 0f;
@@ -170,46 +147,44 @@ public class BoneWobble {
 
         // Skip all updates for locked bones
         if (isLocked) {
-            return; // Exit early for locked bones
+            return;
         }
 
-        // Track significant movement for unlocked bones
-        if (Math.abs(oldAngularVelocity) > 10f || Math.abs(rotation - oldRotation) > 5f) {
+        // Track significant movement
+        if (Math.abs(oldAngularVelocity) > SIGNIFICANT_VELOCITY ||
+                Math.abs(rotation - oldRotation) > SIGNIFICANT_ROTATION) {
             lastSignificantMovement = timeAlive;
         }
 
-        // Calculate parent motion characteristics
+        // === MOTION ANALYSIS ===
         float velocityMagnitude = (float) Math.sqrt(parentVelocityX * parentVelocityX + parentVelocityY * parentVelocityY);
-        boolean isAirborne = Math.abs(parentVelocityY) > 30f || velocityMagnitude > 150f;
-        boolean hasContactedGround = ragdoll.mainBody.y <= ragdoll.getGroundY() + 5f; // Replace isEarlyFlight check
+        boolean isAirborne = Math.abs(parentVelocityY) > AIRBORNE_VELOCITY_THRESHOLD || velocityMagnitude > AIRBORNE_MAGNITUDE_THRESHOLD;
+        boolean hasContactedGround = ragdoll.mainBody.y <= ragdoll.getGroundY() + GROUND_CONTACT_TOLERANCE;
 
-        // Apply rotation
+        // === CORE PHYSICS ===
         rotation += angularVelocity * deltaTime;
 
-        // Apply hierarchical constraints - only during airborne and initial ground contact, not during settling
+        // Apply hierarchical constraints - only during airborne and initial ground contact
         if (chainDepth > 0 && hasContactedGround && isAirborne && !shouldAllowFreeRotation(ragdoll)) {
             applyHierarchicalConstraints(ragdoll, parentHasSettled);
         }
 
-        // Apply limb gravity - only after ground contact
-        if (isLongLimb && parentHasSettled && hasContactedGround && timeSettled < 0.5f) {
+        // Apply limb gravity - only after ground contact during settling
+        if (isLongLimb && parentHasSettled && hasContactedGround && timeSettled < LIMB_SETTLING_TIME) {
             applyLimbGravity(deltaTime);
         }
 
-        // Frame-rate independent damping calculation
+        // === DAMPING CALCULATION ===
         float rotationMagnitude = Math.abs(rotation);
         float constraintViolation = Math.max(0, rotationMagnitude - baseRotationConstraint) / baseRotationConstraint;
 
-        // Calculate base damping factor - this preserves the original logic flow
         float baseDampingFactor;
         if (!hasContactedGround) {
-            // Still airborne - use minimal damping (same as original isEarlyFlight)
-            baseDampingFactor = 0.995f;
+            baseDampingFactor = 0.995f;  // Still airborne
         } else if (isAirborne) {
-            // Has contacted ground but still moving - use moderate damping
-            baseDampingFactor = 0.98f;
+            baseDampingFactor = 0.98f;   // Moving on ground
         } else {
-            // On ground and settling - use the original ground-based damping logic
+            // On ground and settling - original ground logic
             boolean hasVisualAttachment = boneHasVisualAttachment(this.bone);
             if (!hasVisualAttachment && parentHasSettled) {
                 baseDampingFactor = 0.92f - (constraintViolation * 0.1f);
@@ -223,85 +198,129 @@ public class BoneWobble {
         }
         baseDampingFactor = Math.max(0.7f, baseDampingFactor);
 
-        // Apply frame-rate independent damping
-        // Add damping dead zone to prevent micro-oscillations
-        if (parentHasSettled && Math.abs(angularVelocity) < 0.1f) {
+        // Apply damping with deadzone
+        if (parentHasSettled && Math.abs(angularVelocity) < VELOCITY_DEADZONE) {
             angularVelocity = 0f;
         } else {
             angularVelocity *= (float) Math.pow(baseDampingFactor, deltaTime * 60f);
         }
 
-        // Enhanced velocity thresholding
-        if (parentHasSettled && Math.abs(angularVelocity) < 2f) {
+        // Final velocity thresholding
+        if (parentHasSettled && Math.abs(angularVelocity) < SETTLED_VELOCITY_THRESHOLD) {
             angularVelocity = 0f;
         }
 
-        // Constraint restoration force - only when airborne or moving after ground contact
-        if (constraintViolation > 0.2f && (!hasContactedGround || isAirborne) && !shouldAllowFreeRotation(ragdoll)) {
+        // Constraint restoration force
+        if (constraintViolation > CONSTRAINT_VIOLATION_THRESHOLD &&
+                (!hasContactedGround || isAirborne) && !shouldAllowFreeRotation(ragdoll)) {
             float baseStrength = !hasContactedGround ? 3f : 5f;
             float restorationForce = -Math.signum(rotation) * constraintViolation * baseStrength * deltaTime * 60f;
             angularVelocity += restorationForce;
         }
     }
 
+    // ================================
+    // HELPER METHODS
+    // ================================
+
     private void applyHierarchicalConstraints(MultiBodyRagdoll ragdoll, boolean parentHasSettled) {
         float parentWobbleRotation = getParentWobbleRotation(ragdoll);
-        // Calculate the relative rotation from parent
         float relativeRotation = rotation - parentWobbleRotation * parentInfluence;
-
-        // Apply constraint based on chain depth and bone type - but more lenient
         float maxRelativeRotation = baseRotationConstraint * (1.0f - Math.min(chainDepth * 0.05f, 0.3f));
+
         if (Math.abs(relativeRotation) > maxRelativeRotation) {
             float constraintForce = (Math.abs(relativeRotation) - maxRelativeRotation) / maxRelativeRotation;
-            // Gently pull back toward constraint boundary
-            float targetRotation = parentWobbleRotation * parentInfluence
-                    + Math.signum(relativeRotation) * maxRelativeRotation;
+            float targetRotation = parentWobbleRotation * parentInfluence + Math.signum(relativeRotation) * maxRelativeRotation;
             float correctionStrength = parentHasSettled ? 0.03f : 0.01f;
+
             rotation = rotation * (1.0f - correctionStrength) + targetRotation * correctionStrength;
-            // Also reduce angular velocity when violating constraints
             angularVelocity *= (1.0f - constraintForce * 0.1f);
         }
     }
 
-    // Keep existing limb gravity method (unchanged)
     private void applyLimbGravity(float deltaTime) {
         gravityTimer += deltaTime;
-        // Normalize rotation to 0-360 range for easier calculations
         float normalizedRotation = ((rotation % 360f) + 360f) % 360f;
-
-        // Determine if limb is pointing "up" (roughly vertical, pointing skyward)
-        boolean isPointingUp = (normalizedRotation > 45f && normalizedRotation < 135f)
-                || (normalizedRotation > 225f && normalizedRotation < 315f);
+        boolean isPointingUp = (normalizedRotation > 45f && normalizedRotation < 135f) ||
+                (normalizedRotation > 225f && normalizedRotation < 315f);
 
         if (isPointingUp && !hasAppliedGravityCorrection) {
-            // Calculate the closest "flat" position (horizontal)
             float targetRotation;
             if (normalizedRotation >= 45f && normalizedRotation <= 135f) {
-                // Upper right quadrant - fall to right (0° or 360°)
                 targetRotation = (normalizedRotation < 90f) ? 0f : 180f;
             } else {
-                // Upper left quadrant - fall to left (180°)
                 targetRotation = (normalizedRotation < 270f) ? 180f : 0f;
             }
 
-            // Calculate shortest path to target
             float rotationDiff = targetRotation - normalizedRotation;
             if (rotationDiff > 180f) rotationDiff -= 360f;
             if (rotationDiff < -180f) rotationDiff += 360f;
 
-            // Much gentler gravity torque for root limbs to prevent accordion effect
             float verticalness = 1.0f - Math.abs(Math.abs(normalizedRotation - 90f) - 90f) / 90f;
-            float gravityTorque = rotationDiff * verticalness * 2.0f; // Reduced from 4.0f to 2.0f
+            float gravityTorque = rotationDiff * verticalness * 2.0f;
             angularVelocity += gravityTorque;
 
-            // Wider tolerance for completion to prevent micro-corrections
-            if (Math.abs(rotationDiff) < 30f) { // Increased from 20f to 30f
+            if (Math.abs(rotationDiff) < 30f) {
                 hasAppliedGravityCorrection = true;
             }
 
-            if (gravityTimer > 0.5f) { // Reduced logging frequency from 0.3s to 0.5s
+            if (gravityTimer > 0.5f) {
                 gravityTimer = 0f;
             }
         }
+    }
+
+    private boolean shouldAllowFreeRotation(MultiBodyRagdoll ragdoll) {
+        String monsterClassName = ragdoll.getMonsterClassName();
+        String boneName = bone.getData().getName().toLowerCase();
+
+        if (!FREE_ROTATION_ENEMIES.contains(monsterClassName)) {
+            return false;
+        }
+
+        // Constrain antler bones on Louse enemies
+        if ((monsterClassName.equals(LouseNormal.ID) || monsterClassName.equals(LouseDefensive.ID)) &&
+                boneName.contains("ant")) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private float getParentWobbleRotation(MultiBodyRagdoll ragdoll) {
+        if (bone.getParent() != null) {
+            BoneWobble parentWobble = ragdoll.boneWobbles.get(bone.getParent());
+            if (parentWobble != null) {
+                return parentWobble.rotation;
+            }
+        }
+        return 0f;
+    }
+
+    private int calculateChainDepth(Bone bone) {
+        int depth = 0;
+        Bone current = bone;
+        while (current.getParent() != null) {
+            current = current.getParent();
+            depth++;
+        }
+        return depth;
+    }
+
+    private boolean boneHasVisualAttachment(Bone bone) {
+        try {
+            for (Slot slot : bone.getSkeleton().getSlots()) {
+                if (slot.getBone() == bone && slot.getAttachment() != null) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isAnatomicalLimbName(String boneName) {
+        return boneName.matches("^(arm|leg|wing)(_bg|_fg|l|r|left|right)?$");
     }
 }

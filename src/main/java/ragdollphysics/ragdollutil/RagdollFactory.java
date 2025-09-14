@@ -22,257 +22,181 @@ import ragdollphysics.RagdollPhysics;
  * Handles both skeleton-based and image-based monster ragdolls.
  */
 public class RagdollFactory {
-    private static boolean printFactoryLogs = false; // Set to true to enable factory operation logs
-    private final String factoryId;
-    private int ragdollsCreated = 0;
 
-    // Physics constants
+    // ================================
+    // PHYSICS CONSTANTS
+    // ================================
+
     private static final float MIN_FORCE_X = 600f;
     private static final float MAX_FORCE_X = 900f;
     private static final float MIN_FORCE_Y = 1000f;
     private static final float MAX_FORCE_Y = 1500f;
     private static final float DEFAULT_DEATH_TIMER = 2.5f;
 
+    // Bone enhancement multipliers
+    private static final float ATTACHMENT_BONE_MULTIPLIER_MIN = 1.2f;
+    private static final float ATTACHMENT_BONE_MULTIPLIER_MAX = 1.8f;
+    private static final float VISUAL_LIMB_MULTIPLIER_MIN = 1.8f;
+    private static final float VISUAL_LIMB_MULTIPLIER_MAX = 2.5f;
+    private static final float VISUAL_BONE_MULTIPLIER_MIN = 0.8f;
+    private static final float VISUAL_BONE_MULTIPLIER_MAX = 1.3f;
+    private static final float CONTROL_BONE_MULTIPLIER_MIN = 0.2f;
+    private static final float CONTROL_BONE_MULTIPLIER_MAX = 0.5f;
+
+    // Depth reduction factors
+    private static final float CHAIN_DEPTH_REDUCTION_FACTOR = 0.08f;
+    private static final float MAX_DEPTH_REDUCTION = 0.4f;
+    private static final float VISUAL_LIMB_DEPTH_IMPACT = 0.3f;
+    private static final float VISUAL_BONE_DEPTH_IMPACT = 0.2f;
+    private static final float CONTROL_BONE_DEPTH_IMPACT = 0.5f;
+
+    // ================================
+    // INSTANCE STATE
+    // ================================
+
+    private final String factoryId;
+    private int ragdollsCreated = 0;
+
+    // ================================
+    // CONSTRUCTOR
+    // ================================
+
     public RagdollFactory() {
         this.factoryId = "Factory_" + System.currentTimeMillis() % 10000;
-        if (printFactoryLogs) {
-            BaseMod.logger.info("[" + factoryId + "] RagdollFactory initialized");
-        }
     }
 
-    /**
-     * Calculate custom ground level for specific monsters
-     */
-    private float calculateGroundLevel(AbstractMonster monster) {
-        float baseGroundLevel = monster.drawY;
-
-        // Apply monster-specific ground level adjustments
-        switch (monster.id) {
-            case TheGuardian.ID:
-                return baseGroundLevel + (100f * Settings.scale);
-            case Cultist.ID:
-                return baseGroundLevel + (20f * Settings.scale);
-            case Byrd.ID:
-                return AbstractDungeon.player.drawY + (20f * Settings.scale);
-            case BronzeOrb.ID:
-                return AbstractDungeon.player.drawY + (20f * Settings.scale);
-            case SnakeDagger.ID:
-                return AbstractDungeon.player.drawY + (20f * Settings.scale);
-            default:
-                return AbstractDungeon.player.drawY + (20f * Settings.scale);
-        }
-    }
+    // ================================
+    // MAIN FACTORY METHOD
+    // ================================
 
     /**
      * Main factory method - creates appropriate ragdoll type based on monster
-     *
-     * @param monster The monster to create a ragdoll for
-     * @param reflectionHelper Helper for accessing monster internals
-     * @return Created ragdoll instance, or null if image physics is disabled for image-based monsters
-     * @throws Exception if ragdoll creation fails
      */
     public MultiBodyRagdoll createRagdoll(AbstractMonster monster, ReflectionHelper reflectionHelper) throws Exception {
         ragdollsCreated++;
-        String monsterName = monster.id;
-
-        if (printFactoryLogs) {
-            BaseMod.logger.info("[" + factoryId + "] === RAGDOLL CREATION #" + ragdollsCreated + " ===");
-            BaseMod.logger.info("[" + factoryId + "] Creating ragdoll for " + monsterName
-                    + " at position (" + monster.drawX + ", " + monster.drawY + ")");
-        }
 
         try {
             MultiBodyRagdoll ragdoll;
 
             // Determine creation path based on monster type
             if (isImageBasedMonster(monster, reflectionHelper)) {
-                // Check if image physics is enabled before creating image ragdoll
+                // Check if image physics is enabled
                 if (!ragdollphysics.RagdollPhysics.enableImageRagdolls) {
-                    if (printFactoryLogs) {
-                        BaseMod.logger.info("[" + factoryId + "] Image physics disabled - skipping ragdoll creation for image-based monster " + monsterName);
-                    }
-                    return null; // Don't create ragdoll for image-based monsters when disabled
+                    return null; // Skip creation when image ragdolls disabled
                 }
                 ragdoll = createImageRagdoll(monster);
             } else {
                 ragdoll = createSkeletonRagdoll(monster, reflectionHelper);
             }
 
-            // Apply initial physics force
+            // Apply initial physics and setup
             applyInitialForce(ragdoll);
-
-            // Set monster death timer
             monster.deathTimer = DEFAULT_DEATH_TIMER;
 
-            if (printFactoryLogs) {
-                BaseMod.logger.info("[" + factoryId + "] Ragdoll creation successful for " + monsterName);
-            }
             return ragdoll;
+
         } catch (Exception e) {
-            if (printFactoryLogs) {
-                BaseMod.logger.error("[" + factoryId + "] Failed to create ragdoll for " + monsterName
-                        + ": " + e.getMessage());
-            }
-            throw e;
+            throw new Exception("Failed to create ragdoll for " + monster.id + ": " + e.getMessage(), e);
         }
     }
 
+    // ================================
+    // RAGDOLL CREATION METHODS
+    // ================================
+
     /**
-     * Create ragdoll for image-based monsters (like Hexaghost) - UPDATED
+     * Create ragdoll for image-based monsters (like Hexaghost)
      */
     private MultiBodyRagdoll createImageRagdoll(AbstractMonster monster) throws Exception {
-        String monsterName = monster.id;
-        if (printFactoryLogs) {
-            BaseMod.logger.info("[" + factoryId + "] Creating image ragdoll for " + monsterName);
-        }
-
         try {
             float customGroundLevel = calculateGroundLevel(monster);
 
-            if (printFactoryLogs && customGroundLevel != monster.drawY) {
-                BaseMod.logger.info("[" + factoryId + "] Applied custom ground level for " + monsterName
-                        + ": " + monster.drawY + " -> " + customGroundLevel
-                        + " (offset: " + (customGroundLevel - monster.drawY) + ")");
-            }
-
-            MultiBodyRagdoll ragdoll = new MultiBodyRagdoll(
+            return new MultiBodyRagdoll(
                     monster.drawX,
                     monster.drawY,
-                    customGroundLevel,  // Use calculated ground level
-                    monsterName,
+                    customGroundLevel,
+                    monster.id,
                     monster
             );
 
-            if (printFactoryLogs) {
-                BaseMod.logger.info("[" + factoryId + "] Image ragdoll created successfully");
-            }
-            return ragdoll;
         } catch (Exception e) {
             throw new Exception("Failed to create image ragdoll: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Create ragdoll for skeleton-based monsters (normal case) - UPDATED
+     * Create ragdoll for skeleton-based monsters (normal case)
      */
     private MultiBodyRagdoll createSkeletonRagdoll(AbstractMonster monster, ReflectionHelper reflectionHelper) throws Exception {
-        String monsterName = monster.id;
-        if (printFactoryLogs) {
-            BaseMod.logger.info("[" + factoryId + "] Creating skeleton ragdoll for " + monsterName);
-        }
-
         try {
             // Get skeleton components
             Skeleton skeleton = reflectionHelper.getSkeleton(monster);
             SkeletonRenderer sr = reflectionHelper.getSkeletonRenderer(monster);
 
-            if (skeleton == null) {
-                throw new Exception("Skeleton is null");
-            }
-            if (skeleton.getBones() == null || skeleton.getBones().size == 0) {
-                throw new Exception("Skeleton has no bones");
-            }
-            if (sr == null) {
-                throw new Exception("SkeletonRenderer is null");
-            }
+            validateSkeletonComponents(skeleton, sr);
 
             float customGroundLevel = calculateGroundLevel(monster);
-
-            if (printFactoryLogs && customGroundLevel != monster.drawY) {
-                BaseMod.logger.info("[" + factoryId + "] Applied custom ground level for " + monsterName
-                        + ": " + monster.drawY + " -> " + customGroundLevel
-                        + " (offset: " + (customGroundLevel - monster.drawY) + ")");
-            }
 
             // Create the ragdoll with skeleton
             MultiBodyRagdoll ragdoll = new MultiBodyRagdoll(
                     skeleton,
-                    customGroundLevel,   // Use calculated ground level
-                    monster.drawX,       // start X
-                    monster.drawY,       // start Y
-                    monsterName,
+                    customGroundLevel,
+                    monster.drawX,
+                    monster.drawY,
+                    monster.id,
                     monster
             );
 
             // Initialize bone wobbles with hierarchy awareness
             initializeHierarchicalBoneWobbles(ragdoll, skeleton, monster);
 
-            if (printFactoryLogs) {
-                BaseMod.logger.info("[" + factoryId + "] Skeleton ragdoll created with "
-                        + skeleton.getBones().size + " bones");
-            }
             return ragdoll;
+
         } catch (Exception e) {
             throw new Exception("Failed to create skeleton ragdoll: " + e.getMessage(), e);
         }
     }
 
     /**
+     * Validate skeleton components are present and valid
+     */
+    private void validateSkeletonComponents(Skeleton skeleton, SkeletonRenderer sr) throws Exception {
+        if (skeleton == null) {
+            throw new Exception("Skeleton is null");
+        }
+        if (skeleton.getBones() == null || skeleton.getBones().size == 0) {
+            throw new Exception("Skeleton has no bones");
+        }
+        if (sr == null) {
+            throw new Exception("SkeletonRenderer is null");
+        }
+    }
+
+    // ================================
+    // BONE WOBBLE INITIALIZATION
+    // ================================
+
+    /**
      * Initialize bone wobbles with hierarchy-aware physics
      */
     private void initializeHierarchicalBoneWobbles(MultiBodyRagdoll ragdoll, Skeleton skeleton, AbstractMonster monster) {
-        if (printFactoryLogs) {
-            BaseMod.logger.info("[" + factoryId + "] === HIERARCHY-AWARE BONE WOBBLE INITIALIZATION ===");
-        }
-
-        int visualLimbs = 0;
-        int visualBones = 0;
-        int controlBones = 0;
-        int attachmentBones = 0;
+        float overkillDamage = OverkillTracker.getOverkillDamage(monster);
         String monsterName = monster.id;
 
         for (Bone bone : skeleton.getBones()) {
-            // Create bone wobble with hierarchy information
             BoneWobble wobble = new BoneWobble(bone.getRotation(), bone);
 
-            // Apply depth-based reduction (more reasonable than original)
-            float depthReduction = Math.min(wobble.chainDepth * 0.08f, 0.4f);
+            // Apply depth-based reduction
+            float depthReduction = Math.min(wobble.chainDepth * CHAIN_DEPTH_REDUCTION_FACTOR, MAX_DEPTH_REDUCTION);
             wobble.angularVelocity = MathUtils.random(-360f, 360f) * (1.0f - depthReduction);
 
-            // Check if bone has visual attachment
+            // Determine bone characteristics
             boolean hasVisualAttachment = hasVisualAttachment(bone);
-
-            // Categorize bones
-            String boneName = bone.getData().getName().toLowerCase();
-
-            // Check if this bone will become a detached attachment
-            // Get overkill damage first
-            float overkillDamage = OverkillTracker.getOverkillDamage(monster);
-
-            // Then use it in the bone check
             boolean willBeDetached = willBoneBeDetached(bone, skeleton, monsterName, overkillDamage);
-            boolean isVisualLimb = hasVisualAttachment
-                    && boneName.matches("^(arm|leg|wing)(_bg|_fg|l|r|left|right)?$");
+            boolean isVisualLimb = hasVisualAttachment && isLimbBone(bone);
 
-            // Apply appropriate physics enhancement based on bone type
-            if (willBeDetached) {
-                // Bones with detached attachments get moderate enhancement
-                wobble.angularVelocity *= MathUtils.random(1.2f, 1.8f);
-                attachmentBones++;
-                if (printFactoryLogs) {
-                    BaseMod.logger.info("[" + factoryId + "] Enhanced attachment bone: "
-                            + bone.getData().getName() + " with angVel: "
-                            + String.format("%.1f", wobble.angularVelocity));
-                }
-            } else if (isVisualLimb) {
-                // Visual limbs get enhanced motion with depth constraints
-                wobble.angularVelocity *= MathUtils.random(1.8f, 2.5f) * (1.0f - depthReduction * 0.3f);
-                visualLimbs++;
-                if (printFactoryLogs) {
-                    BaseMod.logger.info("[" + factoryId + "] Enhanced visual limb: "
-                            + bone.getData().getName() + " with angVel: "
-                            + String.format("%.1f", wobble.angularVelocity)
-                            + ", depth: " + wobble.chainDepth);
-                }
-            } else if (hasVisualAttachment) {
-                // Other visual bones get slight enhancement
-                wobble.angularVelocity *= MathUtils.random(0.8f, 1.3f) * (1.0f - depthReduction * 0.2f);
-                visualBones++;
-            } else {
-                // Animation control bones get reduced motion
-                wobble.angularVelocity *= MathUtils.random(0.2f, 0.5f) * (1.0f - depthReduction * 0.5f);
-                controlBones++;
-            }
+            // Apply appropriate physics enhancement
+            applyBoneEnhancement(wobble, willBeDetached, isVisualLimb, hasVisualAttachment, depthReduction);
 
             // Apply minimal random initial rotation offset
             wobble.rotation += MathUtils.random(-2f, 2f);
@@ -280,12 +204,56 @@ public class RagdollFactory {
             // Store the wobble in the ragdoll
             ragdoll.boneWobbles.put(bone, wobble);
         }
+    }
 
-        if (printFactoryLogs) {
-            BaseMod.logger.info("[" + factoryId + "] Bone initialization complete - Visual Limbs: "
-                    + visualLimbs + ", Visual Parts: " + visualBones + ", Control Bones: "
-                    + controlBones + ", Attachment Bones: " + attachmentBones
-                    + ", Total: " + ragdoll.boneWobbles.size());
+    /**
+     * Apply physics enhancement based on bone type
+     */
+    private void applyBoneEnhancement(BoneWobble wobble, boolean willBeDetached, boolean isVisualLimb,
+                                      boolean hasVisualAttachment, float depthReduction) {
+
+        if (willBeDetached) {
+            // Bones with detached attachments get moderate enhancement
+            wobble.angularVelocity *= MathUtils.random(ATTACHMENT_BONE_MULTIPLIER_MIN, ATTACHMENT_BONE_MULTIPLIER_MAX);
+
+        } else if (isVisualLimb) {
+            // Visual limbs get enhanced motion with depth constraints
+            float multiplier = MathUtils.random(VISUAL_LIMB_MULTIPLIER_MIN, VISUAL_LIMB_MULTIPLIER_MAX);
+            wobble.angularVelocity *= multiplier * (1.0f - depthReduction * VISUAL_LIMB_DEPTH_IMPACT);
+
+        } else if (hasVisualAttachment) {
+            // Other visual bones get slight enhancement
+            float multiplier = MathUtils.random(VISUAL_BONE_MULTIPLIER_MIN, VISUAL_BONE_MULTIPLIER_MAX);
+            wobble.angularVelocity *= multiplier * (1.0f - depthReduction * VISUAL_BONE_DEPTH_IMPACT);
+
+        } else {
+            // Animation control bones get reduced motion
+            float multiplier = MathUtils.random(CONTROL_BONE_MULTIPLIER_MIN, CONTROL_BONE_MULTIPLIER_MAX);
+            wobble.angularVelocity *= multiplier * (1.0f - depthReduction * CONTROL_BONE_DEPTH_IMPACT);
+        }
+    }
+
+    // ================================
+    // HELPER METHODS
+    // ================================
+
+    /**
+     * Calculate custom ground level for specific monsters
+     */
+    private float calculateGroundLevel(AbstractMonster monster) {
+        float baseGroundLevel = monster.drawY;
+
+        switch (monster.id) {
+            case TheGuardian.ID:
+                return baseGroundLevel + (100f * Settings.scale);
+            case Cultist.ID:
+                return baseGroundLevel + (20f * Settings.scale);
+            case Byrd.ID:
+            case BronzeOrb.ID:
+            case SnakeDagger.ID:
+                return AbstractDungeon.player.drawY + (20f * Settings.scale);
+            default:
+                return AbstractDungeon.player.drawY + (20f * Settings.scale);
         }
     }
 
@@ -300,9 +268,17 @@ public class RagdollFactory {
                 }
             }
         } catch (Exception e) {
-            return true; // Default to visual if we can't determine
+            return true; // Default to visual if determination fails
         }
         return false;
+    }
+
+    /**
+     * Check if bone is a limb based on naming pattern
+     */
+    private boolean isLimbBone(Bone bone) {
+        String boneName = bone.getData().getName().toLowerCase();
+        return boneName.matches("^(arm|leg|wing)(_bg|_fg|l|r|left|right)?$");
     }
 
     /**
@@ -331,19 +307,11 @@ public class RagdollFactory {
         // Determine direction based on monster position relative to player
         float playerX = AbstractDungeon.player.drawX;
         float monsterX = ragdoll.getAssociatedMonster().drawX;
-
-        // If monster is to the left of player, send it left (negative)
-        // If monster is to the right of player, send it right (positive)
         float forceX = (monsterX < playerX) ? -baseForceX : baseForceX;
-
-        if (printFactoryLogs) {
-            BaseMod.logger.info("[" + factoryId + "] Directional force - Player: " + playerX
-                    + ", Monster: " + monsterX + ", Force: (" + forceX + ", " + forceY + ")");
-        }
 
         ragdoll.applyGlobalForce(forceX, forceY);
 
-        // Initialize rotation tracking to prevent phantom rotation on first frame
+        // Initialize rotation tracking
         ragdoll.lastRotation = ragdoll.mainBody.rotation;
         ragdoll.totalRotationDegrees = 0f;
     }
@@ -353,35 +321,16 @@ public class RagdollFactory {
      */
     private boolean isImageBasedMonster(AbstractMonster monster, ReflectionHelper reflectionHelper) {
         try {
-            return reflectionHelper.getImage(monster) != null
-                    && reflectionHelper.getSkeleton(monster) == null;
+            return reflectionHelper.getImage(monster) != null &&
+                    reflectionHelper.getSkeleton(monster) == null;
         } catch (Exception e) {
-            BaseMod.logger.info("[" + factoryId + "] Could not determine monster type for "
-                    + monster.getClass().getSimpleName() + ": " + e.getMessage());
             return false;
         }
     }
 
-    /**
-     * Create ragdoll with custom parameters (for testing/debugging)
-     */
-    public MultiBodyRagdoll createCustomRagdoll(AbstractMonster monster, ReflectionHelper reflectionHelper,
-                                                float forceX, float forceY, float deathTimer) throws Exception {
-        MultiBodyRagdoll ragdoll = createRagdoll(monster, reflectionHelper);
-
-        // Override default force
-        ragdoll.applyGlobalForce(forceX, forceY);
-
-        // Override death timer
-        monster.deathTimer = deathTimer;
-
-        if (printFactoryLogs) {
-            BaseMod.logger.info("[" + factoryId + "] Created custom ragdoll with force("
-                    + forceX + ", " + forceY + "), timer=" + deathTimer);
-        }
-
-        return ragdoll;
-    }
+    // ================================
+    // FACTORY STATISTICS
+    // ================================
 
     /**
      * Get factory statistics

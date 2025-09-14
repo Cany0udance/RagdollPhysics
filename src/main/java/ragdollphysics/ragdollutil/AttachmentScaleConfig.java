@@ -13,9 +13,6 @@ public class AttachmentScaleConfig {
     static {
         // Guardian appears to be designed to render at half scale
         MONSTER_SCALE_OVERRIDES.put(TheGuardian.ID, 0.5f);
-
-        // Add other monsters as needed
-        // MONSTER_SCALE_OVERRIDES.put(SomeOtherBoss.ID, 0.75f);
     }
 
     /**

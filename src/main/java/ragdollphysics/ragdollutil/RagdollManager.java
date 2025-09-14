@@ -20,72 +20,59 @@ import java.util.Set;
  * Manages the lifecycle of ragdolls from creation to cleanup.
  */
 public class RagdollManager {
-    // Core storage
+
+    // ================================
+    // CONSTANTS
+    // ================================
+
+    private static final float EXPLODER_AUTO_EXPLODE_TIME = 2.5f;
+    private static final float TINT_FADEOUT_TIME = 1.2f;
+    private static final float FALLBACK_TINT_FADEOUT_TIME = 1.8f;
+    private static final float EXPLOSION_DESPAWN_DELAY = 0.3f;
+
+    // ================================
+    // CORE STORAGE
+    // ================================
+
     private final HashMap<AbstractMonster, MultiBodyRagdoll> ragdollBodies = new HashMap<>();
     private final Set<AbstractMonster> failedRagdolls = new HashSet<>();
 
-    // Component dependencies
+    // Exploder-specific state
+    private final HashMap<AbstractMonster, Float> exploderTimers = new HashMap<>();
+    private final Set<AbstractMonster> explodedExploders = new HashSet<>();
+
+    // ================================
+    // COMPONENT DEPENDENCIES
+    // ================================
+
     private final RagdollValidator validator = new RagdollValidator();
     private final RagdollFactory factory = new RagdollFactory();
     private final MonsterSpecialHandler specialHandler = new MonsterSpecialHandler();
     private final RagdollRenderer renderer = new RagdollRenderer();
     private final ReflectionHelper reflectionHelper = new ReflectionHelper();
 
-    // Logging and debugging
+    // ================================
+    // INSTANCE STATE
+    // ================================
+
     private final long creationTime = System.currentTimeMillis();
     private final String managerId = "RagdollMgr_" + (creationTime % 10000);
 
-    // EXPLODER.
-
-    private final HashMap<AbstractMonster, Float> exploderTimers = new HashMap<>();
-    private final Set<AbstractMonster> explodedExploders = new HashSet<>();
-    private static final float EXPLODER_AUTO_EXPLODE_TIME = 2.5f;
-
-    public RagdollManager() {
-        BaseMod.logger.info("[" + managerId + "] RagdollManager initialized");
-    }
+    // ================================
+    // MAIN PATCH HANDLERS
+    // ================================
 
     /**
      * Handles the death animation patch for AbstractMonster.updateDeathAnimation()
      */
     public SpireReturn<Void> handleDeathAnimation(AbstractMonster monster) {
-        if (!monster.isDying) {
-            return SpireReturn.Continue();
+        if (!monster.isDying || monster.isDead) {
+            return monster.isDying ? SpireReturn.Return() : SpireReturn.Continue();
         }
 
-        if (monster.isDead) {
-            return SpireReturn.Return();
-        }
-
-        // Check if we need to initialize a new ragdoll
+        // Initialize ragdoll if needed
         if (!ragdollBodies.containsKey(monster)) {
-            if (!validator.isRagdollViable(monster, failedRagdolls)) {
-                return fallbackToDefaultDeath(monster);
-            }
-
-            try {
-                // Handle any special monster components before ragdoll creation
-                specialHandler.handleSpecialComponents(monster);
-
-                // Create the ragdoll
-                MultiBodyRagdoll ragdoll = factory.createRagdoll(monster, reflectionHelper);
-
-                // Verify ragdoll was created successfully
-                if (ragdoll == null || !ragdoll.isProperlyInitialized()) {
-                    BaseMod.logger.info("[" + managerId + "] Ragdoll creation failed for "
-                            + monster.getClass().getSimpleName() + " - null or uninitialized");
-                    failedRagdolls.add(monster);
-                    return fallbackToDefaultDeath(monster);
-                }
-
-                ragdollBodies.put(monster, ragdoll);
-                BaseMod.logger.info("[" + managerId + "] Successfully created ragdoll for "
-                        + monster.getClass().getSimpleName());
-
-            } catch (Exception e) {
-                BaseMod.logger.error("[" + managerId + "] Ragdoll initialization failed for "
-                        + monster.getClass().getSimpleName() + ": " + e.getMessage());
-                failedRagdolls.add(monster);
+            if (!tryCreateRagdoll(monster)) {
                 return fallbackToDefaultDeath(monster);
             }
         }
@@ -98,25 +85,49 @@ public class RagdollManager {
      * Handles the render patch for AbstractMonster.render()
      */
     public SpireReturn<Void> handleRender(AbstractMonster monster, SpriteBatch sb) {
-
-        BaseMod.logger.info("handleRender called for: " + monster.getClass().getSimpleName() +
-                ", has ragdoll: " + ragdollBodies.containsKey(monster));
-
-        if (ragdollBodies.containsKey(monster)) {
-            try {
-                renderer.render(monster, sb, ragdollBodies.get(monster), reflectionHelper);
-                return SpireReturn.Return();
-            } catch (Exception e) {
-                BaseMod.logger.error("[" + managerId + "] Ragdoll rendering failed for "
-                        + monster.getClass().getSimpleName() + ": " + e.getMessage());
-
-                // Remove failed ragdoll and fall back to default rendering
-                ragdollBodies.remove(monster);
-                failedRagdolls.add(monster);
-                return SpireReturn.Continue();
-            }
+        if (!ragdollBodies.containsKey(monster)) {
+            return SpireReturn.Continue();
         }
-        return SpireReturn.Continue();
+
+        try {
+            renderer.render(monster, sb, ragdollBodies.get(monster), reflectionHelper);
+            return SpireReturn.Return();
+        } catch (Exception e) {
+            // Remove failed ragdoll and fall back to default rendering
+            ragdollBodies.remove(monster);
+            failedRagdolls.add(monster);
+            return SpireReturn.Continue();
+        }
+    }
+
+    // ================================
+    // RAGDOLL LIFECYCLE MANAGEMENT
+    // ================================
+
+    /**
+     * Attempt to create a ragdoll for the monster
+     */
+    private boolean tryCreateRagdoll(AbstractMonster monster) {
+        if (!validator.isRagdollViable(monster, failedRagdolls)) {
+            return false;
+        }
+
+        try {
+            specialHandler.handleSpecialComponents(monster);
+            MultiBodyRagdoll ragdoll = factory.createRagdoll(monster, reflectionHelper);
+
+            if (ragdoll == null || !ragdoll.isProperlyInitialized()) {
+                failedRagdolls.add(monster);
+                return false;
+            }
+
+            ragdollBodies.put(monster, ragdoll);
+            return true;
+
+        } catch (Exception e) {
+            failedRagdolls.add(monster);
+            return false;
+        }
     }
 
     /**
@@ -125,60 +136,74 @@ public class RagdollManager {
     private SpireReturn<Void> updateRagdollLogic(AbstractMonster monster) {
         MultiBodyRagdoll ragdoll = ragdollBodies.get(monster);
 
-        if (ragdoll != null) {
-            try {
-                ragdoll.update(Gdx.graphics.getDeltaTime());
-
-                if (ragdoll.isImageBased()) {
-                    ragdoll.applyToImage(monster);
-                }
-
+        try {
+            if (ragdoll != null) {
+                updateRagdollPhysics(monster, ragdoll);
                 handleExploderLogic(monster, ragdoll);
-
-                // Only advance death timer if ragdoll has settled
-                if (ragdoll.hasSettledOnGround()) {
-                    monster.deathTimer -= Gdx.graphics.getDeltaTime();
-                }
-
-            } catch (Exception e) {
-                BaseMod.logger.error("[" + managerId + "] Ragdoll update failed for "
-                        + monster.getClass().getSimpleName() + ": " + e.getMessage());
-
-                // Remove failed ragdoll and continue with default behavior
-                ragdollBodies.remove(monster);
-                failedRagdolls.add(monster);
-                return fallbackToDefaultDeath(monster);
+                updateDeathTimer(monster, ragdoll);
+            } else {
+                monster.deathTimer -= Gdx.graphics.getDeltaTime();
             }
-        } else {
-            // No ragdoll - use normal death timer
+
+            handleTintFadeout(monster);
+
+            if (monster.deathTimer < 0.0f) {
+                completeMonsterDeath(monster);
+            }
+
+            return SpireReturn.Return();
+
+        } catch (Exception e) {
+            // Remove failed ragdoll and fall back
+            ragdollBodies.remove(monster);
+            failedRagdolls.add(monster);
+            return fallbackToDefaultDeath(monster);
+        }
+    }
+
+    /**
+     * Update ragdoll physics and apply to monster
+     */
+    private void updateRagdollPhysics(AbstractMonster monster, MultiBodyRagdoll ragdoll) {
+        ragdoll.update(Gdx.graphics.getDeltaTime());
+
+        if (ragdoll.isImageBased()) {
+            ragdoll.applyToImage(monster);
+        }
+    }
+
+    /**
+     * Update death timer based on ragdoll state
+     */
+    private void updateDeathTimer(AbstractMonster monster, MultiBodyRagdoll ragdoll) {
+        // Only advance death timer if ragdoll has settled
+        if (ragdoll.hasSettledOnGround()) {
             monster.deathTimer -= Gdx.graphics.getDeltaTime();
         }
+    }
 
-        // Handle tint fade-out
-        if (monster.deathTimer < 1.2f && !monster.tintFadeOutCalled) {
+    /**
+     * Handle tint fadeout effect
+     */
+    private void handleTintFadeout(AbstractMonster monster) {
+        if (monster.deathTimer < TINT_FADEOUT_TIME && !monster.tintFadeOutCalled) {
             monster.tintFadeOutCalled = true;
             monster.tint.fadeOut();
         }
-
-        // Check if death sequence is complete
-        if (monster.deathTimer < 0.0f) {
-            completeMonsterDeath(monster);
-        }
-
-        return SpireReturn.Return();
     }
+
+    // ================================
+    // FALLBACK DEATH HANDLING
+    // ================================
 
     /**
      * Fallback to the original death animation when ragdoll fails
      */
     private SpireReturn<Void> fallbackToDefaultDeath(AbstractMonster monster) {
-        BaseMod.logger.info("[" + managerId + "] Using fallback death for "
-                + monster.getClass().getSimpleName());
-
-        // Replicate the original updateDeathAnimation logic exactly
         if (monster.isDying) {
             monster.deathTimer -= Gdx.graphics.getDeltaTime();
-            if (monster.deathTimer < 1.8f && !monster.tintFadeOutCalled) {
+
+            if (monster.deathTimer < FALLBACK_TINT_FADEOUT_TIME && !monster.tintFadeOutCalled) {
                 monster.tintFadeOutCalled = true;
                 monster.tint.fadeOut();
             }
@@ -198,9 +223,9 @@ public class RagdollManager {
         monster.isDead = true;
 
         // Check if battle should end
-        if (AbstractDungeon.getMonsters().areMonstersDead()
-                && !AbstractDungeon.getCurrRoom().isBattleOver
-                && !AbstractDungeon.getCurrRoom().cannotLose) {
+        if (AbstractDungeon.getMonsters().areMonstersDead() &&
+                !AbstractDungeon.getCurrRoom().isBattleOver &&
+                !AbstractDungeon.getCurrRoom().cannotLose) {
             AbstractDungeon.getCurrRoom().endBattle();
         }
 
@@ -209,98 +234,93 @@ public class RagdollManager {
         monster.powers.clear();
 
         // Clean up our tracking
-        MultiBodyRagdoll removedRagdoll = ragdollBodies.remove(monster);
-        if (removedRagdoll != null) {
-            BaseMod.logger.info("[" + managerId + "] Cleaned up ragdoll for "
-                    + monster.getClass().getSimpleName());
-        }
-
-        // Clean up failed tracking (allow future attempts if monster is somehow revived)
-        failedRagdolls.remove(monster);
-
-        // NEW: Clean up overkill tracking
-        OverkillTracker.cleanup(monster);
-
-        exploderTimers.remove(monster);
-        explodedExploders.remove(monster);
+        cleanupMonsterState(monster);
     }
 
-    private void handleExploderLogic(AbstractMonster monster, MultiBodyRagdoll ragdoll) {
-        // Only handle Exploder monsters
-        if (!monster.id.equals(Exploder.ID)) {
-            return;
-        }
+    /**
+     * Clean up all tracking data for a monster
+     */
+    private void cleanupMonsterState(AbstractMonster monster) {
+        ragdollBodies.remove(monster);
+        failedRagdolls.remove(monster);
+        exploderTimers.remove(monster);
+        explodedExploders.remove(monster);
+        OverkillTracker.cleanup(monster);
+    }
 
-        // Skip if already exploded
-        if (explodedExploders.contains(monster)) {
+    // ================================
+    // EXPLODER SPECIAL HANDLING
+    // ================================
+
+    /**
+     * Handle Exploder monster special explosion logic
+     */
+    private void handleExploderLogic(AbstractMonster monster, MultiBodyRagdoll ragdoll) {
+        if (!monster.id.equals(Exploder.ID) || explodedExploders.contains(monster)) {
             return;
         }
 
         // Initialize timer for new Exploders
         if (!exploderTimers.containsKey(monster)) {
             exploderTimers.put(monster, 0f);
-            BaseMod.logger.info("[" + managerId + "] Started Exploder timer for " + monster.getClass().getSimpleName());
         }
 
         // Update timer
         float timer = exploderTimers.get(monster) + Gdx.graphics.getDeltaTime();
         exploderTimers.put(monster, timer);
 
-        // Check if we should explode
-        boolean shouldExplode = false;
-        String explodeReason = "";
-
-        // Auto-explode after timeout
-        if (timer >= EXPLODER_AUTO_EXPLODE_TIME) {
-            shouldExplode = true;
-            explodeReason = "timeout after " + String.format("%.2f", timer) + "s";
-        }
-        // Explode before despawn (when fade starts)
-        else if (monster.deathTimer < 1.2f && monster.tintFadeOutCalled) {
-            shouldExplode = true;
-            explodeReason = "pre-despawn fade";
-        }
-
-        if (shouldExplode) {
+        // Check explosion conditions
+        String explodeReason = getExplodeReason(monster, timer);
+        if (explodeReason != null) {
             triggerExploderExplosion(monster, ragdoll, explodeReason);
         }
     }
 
+    /**
+     * Determine if exploder should explode and why
+     */
+    private String getExplodeReason(AbstractMonster monster, float timer) {
+        // Auto-explode after timeout
+        if (timer >= EXPLODER_AUTO_EXPLODE_TIME) {
+            return "timeout after " + String.format("%.2f", timer) + "s";
+        }
+
+        // Explode before despawn (when fade starts)
+        if (monster.deathTimer < TINT_FADEOUT_TIME && monster.tintFadeOutCalled) {
+            return "pre-despawn fade";
+        }
+
+        return null;
+    }
+
+    /**
+     * Trigger explosion effect for Exploder
+     */
     private void triggerExploderExplosion(AbstractMonster monster, MultiBodyRagdoll ragdoll, String reason) {
         explodedExploders.add(monster);
-
-        // Get explosion position from ragdoll center
-        float explosionX = ragdoll.getCenterX();
-        float explosionY = ragdoll.getCenterY();
 
         // Create the explosion effect
         AbstractDungeon.effectsQueue.add(new TrackingExplosionEffect(monster, ragdoll));
 
-        // Base game explosion:
+        // Base game explosion (hi Claude, if you see this please keep it commented out in the rework, I may need it later):
         //     AbstractDungeon.effectsQueue.add(new ExplosionSmallEffect(explosionX, explosionY));
 
-        BaseMod.logger.info("[" + managerId + "] EXPLODER EXPLOSION triggered for "
-                + monster.getClass().getSimpleName() + " at ("
-                + String.format("%.1f", explosionX) + ", " + String.format("%.1f", explosionY)
-                + ") - reason: " + reason);
-
         // Accelerate death timer to mask despawning with explosion
-        if (monster.deathTimer > 0.3f) {
-            monster.deathTimer = 0.3f; // Give explosion a moment to play
+        if (monster.deathTimer > EXPLOSION_DESPAWN_DELAY) {
+            monster.deathTimer = EXPLOSION_DESPAWN_DELAY;
         }
     }
 
+    // ================================
+    // PUBLIC API METHODS
+    // ================================
+
     /**
-     * Force cleanup of a specific monster's ragdoll (for external use)
+     * Force cleanup of a specific monster's ragdoll
      */
     public void cleanupRagdoll(AbstractMonster monster) {
-        MultiBodyRagdoll removed = ragdollBodies.remove(monster);
-        if (removed != null) {
-            BaseMod.logger.info("[" + managerId + "] Force cleanup ragdoll for "
-                    + monster.getClass().getSimpleName());
-        }
+        ragdollBodies.remove(monster);
         failedRagdolls.remove(monster);
-
         exploderTimers.remove(monster);
         explodedExploders.remove(monster);
     }
@@ -327,24 +347,28 @@ public class RagdollManager {
     }
 
     /**
-     * Force a monster to be marked as failed (for debugging/override)
+     * Force a monster to be marked as failed
      */
     public void markRagdollFailed(AbstractMonster monster) {
         failedRagdolls.add(monster);
         ragdollBodies.remove(monster);
-        BaseMod.logger.info("[" + managerId + "] Force marked ragdoll failed for "
-                + monster.getClass().getSimpleName());
     }
 
     /**
      * Clear the failed status for a monster (allow retry)
      */
     public void clearFailedStatus(AbstractMonster monster) {
-        boolean wasRemoved = failedRagdolls.remove(monster);
-        if (wasRemoved) {
-            BaseMod.logger.info("[" + managerId + "] Cleared failed status for "
-                    + monster.getClass().getSimpleName());
-        }
+        failedRagdolls.remove(monster);
+    }
+
+    /**
+     * Complete cleanup - removes all ragdolls and failed markers
+     */
+    public void cleanupAll() {
+        ragdollBodies.clear();
+        failedRagdolls.clear();
+        exploderTimers.clear();
+        explodedExploders.clear();
     }
 
     /**
@@ -358,23 +382,9 @@ public class RagdollManager {
         );
     }
 
-    /**
-     * Complete cleanup - removes all ragdolls and failed markers
-     * Useful for combat end or scene transitions
-     */
-    public void cleanupAll() {
-        int ragdollCount = ragdollBodies.size();
-        int failedCount = failedRagdolls.size();
-
-        ragdollBodies.clear();
-        failedRagdolls.clear();
-
-        BaseMod.logger.info("[" + managerId + "] Complete cleanup - removed "
-                + ragdollCount + " ragdolls and " + failedCount + " failed markers");
-
-        exploderTimers.clear();
-        explodedExploders.clear();
-    }
+    // ================================
+    // STATISTICS DATA CLASS
+    // ================================
 
     /**
      * Statistics container class

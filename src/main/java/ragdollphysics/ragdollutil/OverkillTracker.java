@@ -28,7 +28,6 @@ public class OverkillTracker {
     public static float calculateAndRecordOverkill(AbstractMonster monster) {
         PreDamageState preState = preDamageStates.get(monster);
         if (preState == null) {
-            BaseMod.logger.warn("No pre-damage state found for " + monster.getClass().getSimpleName());
             return 20f; // Default to baseline if no data
         }
 
@@ -40,9 +39,9 @@ public class OverkillTracker {
 
         overkillValues.put(monster, overkillDamage);
 
-        BaseMod.logger.info("Calculated overkill for " + monster.getClass().getSimpleName()
-                + ": " + String.format("%.1f", overkillDamage) + " (damage: "
-                + preState.damageAmount + ", health: " + preState.health + ")");
+      //  BaseMod.logger.info("Calculated overkill for " + monster.getClass().getSimpleName()
+      //          + ": " + String.format("%.1f", overkillDamage) + " (damage: "
+      //          + preState.damageAmount + ", health: " + preState.health + ")");
 
         return overkillDamage;
     }

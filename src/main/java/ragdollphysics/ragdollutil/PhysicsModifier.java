@@ -12,9 +12,47 @@ import com.megacrit.cardcrawl.monsters.exordium.*;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 
-// PhysicsModifier.java - Calculates physics adjustments based on overkill and weight
+/**
+ * Calculates physics adjustments based on overkill damage and enemy weight.
+ * Modifies velocity multipliers to create more dramatic or subtle ragdoll effects.
+ */
 public class PhysicsModifier {
-    // === ENEMY WEIGHT SYSTEM ===
+
+    // ================================
+    // SCALING PARAMETERS
+    // ================================
+
+    // Overkill damage scaling thresholds
+    private static final float OVERKILL_BASELINE = 20f;
+    private static final float OVERKILL_MAX = 50f;
+
+    // Horizontal velocity scaling (linear interpolation)
+    private static final float MIN_HORIZONTAL_SCALE = 0.2f;
+    private static final float MAX_HORIZONTAL_SCALE = 1.5f;
+
+    // Vertical velocity scaling (tiered system)
+    private static final float VERTICAL_TINY_HOP_SCALE = 0.3f;      // 0-5 overkill
+    private static final float VERTICAL_SMALL_HOP_SCALE = 0.4f;     // 6-19 overkill
+    private static final float VERTICAL_BASELINE_SCALE = 1.0f;      // 20 overkill
+    private static final float VERTICAL_MAX_SCALE = 1.3f;           // 21-50 overkill
+
+    // Vertical scaling breakpoints
+    private static final float VERTICAL_TINY_THRESHOLD = 5f;
+    private static final float VERTICAL_SMALL_THRESHOLD = 19f;
+
+    // Angular velocity scaling (linear interpolation)
+    private static final float MIN_ANGULAR_SCALE = 0.3f;
+    private static final float MAX_ANGULAR_SCALE = 1.4f;
+
+    // Weight impact on different velocity types
+    private static final float WEIGHT_HORIZONTAL_IMPACT = 1.0f;
+    private static final float WEIGHT_VERTICAL_IMPACT = 0.7f;
+    private static final float WEIGHT_ANGULAR_IMPACT = 0.8f;
+
+    // ================================
+    // ENEMY WEIGHT SYSTEM
+    // ================================
+
     public enum EnemyWeight {
         LIGHT(1.5f),    // Gets knocked around easily
         MEDIUM(1.0f),   // Baseline behavior
@@ -27,10 +65,10 @@ public class PhysicsModifier {
         }
     }
 
-    // Enemy weight database - add entries as needed
     private static final HashMap<String, EnemyWeight> ENEMY_WEIGHTS = new HashMap<>();
+
     static {
-        // Light enemies (get knocked around easily)
+        // === LIGHT ENEMIES (get knocked around easily) ===
         ENEMY_WEIGHTS.put(LouseDefensive.ID, EnemyWeight.LIGHT);
         ENEMY_WEIGHTS.put(LouseNormal.ID, EnemyWeight.LIGHT);
         ENEMY_WEIGHTS.put(AcidSlime_S.ID, EnemyWeight.LIGHT);
@@ -47,7 +85,7 @@ public class PhysicsModifier {
         ENEMY_WEIGHTS.put(BronzeOrb.ID, EnemyWeight.LIGHT);
         ENEMY_WEIGHTS.put(SnakeDagger.ID, EnemyWeight.LIGHT);
 
-        // Medium enemies (baseline behavior)
+        // === MEDIUM ENEMIES (baseline behavior) ===
         ENEMY_WEIGHTS.put(Cultist.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(JawWorm.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(AcidSlime_M.ID, EnemyWeight.MEDIUM);
@@ -75,7 +113,7 @@ public class PhysicsModifier {
         ENEMY_WEIGHTS.put(Reptomancer.ID, EnemyWeight.MEDIUM);
         ENEMY_WEIGHTS.put(Nemesis.ID, EnemyWeight.MEDIUM);
 
-        // Heavy enemies (barely budge)
+        // === HEAVY ENEMIES (barely budge) ===
         ENEMY_WEIGHTS.put(SpikeSlime_L.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(AcidSlime_L.ID, EnemyWeight.HEAVY);
         ENEMY_WEIGHTS.put(GremlinNob.ID, EnemyWeight.HEAVY);
@@ -98,49 +136,9 @@ public class PhysicsModifier {
         ENEMY_WEIGHTS.put(SpireShield.ID, EnemyWeight.HEAVY);
     }
 
-    private static EnemyWeight getWeight(AbstractMonster monster) {
-        String monsterID = getMonsterID(monster);
-        return ENEMY_WEIGHTS.getOrDefault(monsterID, EnemyWeight.MEDIUM);
-    }
-
-    private static String getMonsterID(AbstractMonster monster) {
-        // Try to get the ID field via reflection
-        try {
-            Field idField = monster.getClass().getField("ID");
-            return (String) idField.get(null);
-        } catch (Exception e) {
-            // Fallback to class name if ID field not accessible
-            return monster.getClass().getSimpleName();
-        }
-    }
-    // === TUNABLE PARAMETERS ===
-    // Overkill damage scaling (0 = no overkill, 20 = baseline, 50 = maximum)
-    private static final float OVERKILL_BASELINE = 20f;
-    private static final float OVERKILL_MAX = 50f;
-    private static final float OVERKILL_MIN = 0f;
-
-    // Horizontal velocity scaling (linear from min to max)
-    private static final float MIN_HORIZONTAL_SCALE = 0.2f;  // At 0 overkill, reduce to 20% of normal
-    private static final float MAX_HORIZONTAL_SCALE = 1.5f;  // At 50 overkill, increase to 150% of normal
-
-    // Vertical velocity scaling (tiered system for more dramatic differences)
-    private static final float VERTICAL_TINY_HOP_SCALE = 0.3f;     // 0-5 overkill: barely hop
-    private static final float VERTICAL_SMALL_HOP_SCALE = 0.4f;     // 6-19 overkill: small jump
-    private static final float VERTICAL_BASELINE_SCALE = 1.0f;      // 20 overkill: baseline
-    private static final float VERTICAL_MAX_SCALE = 1.3f;           // 21-50 overkill: bigger jump (capped)
-
-    // Overkill breakpoints for vertical velocity
-    private static final float VERTICAL_TINY_THRESHOLD = 5f;
-    private static final float VERTICAL_SMALL_THRESHOLD = 19f;
-
-    // Angular velocity scaling
-    private static final float MIN_ANGULAR_SCALE = 0.3f;   // At 0 overkill, reduce to 30% of normal
-    private static final float MAX_ANGULAR_SCALE = 1.4f;   // At 50 overkill, increase to 140% of normal
-
-    // Weight impact on different velocity types
-    private static final float WEIGHT_HORIZONTAL_IMPACT = 1.0f;    // Full weight impact on horizontal
-    private static final float WEIGHT_VERTICAL_IMPACT = 0.7f;      // Significant weight impact on vertical
-    private static final float WEIGHT_ANGULAR_IMPACT = 0.8f;       // Most weight impact on angular
+    // ================================
+    // VELOCITY MODIFIER DATA CLASS
+    // ================================
 
     public static class VelocityModifiers {
         public final float horizontalMultiplier;
@@ -160,62 +158,103 @@ public class PhysicsModifier {
         }
     }
 
+    // ================================
+    // PUBLIC API
+    // ================================
+
+    /**
+     * Calculate velocity modifiers for a monster based on overkill damage and weight
+     */
     public static VelocityModifiers calculateModifiers(AbstractMonster monster) {
         float overkillDamage = OverkillTracker.getOverkillDamage(monster);
         EnemyWeight weight = getWeight(monster);
 
-        // Calculate horizontal scaling (linear from 0-50 overkill)
-        float overkillRatio = Math.max(0f, Math.min(1f, overkillDamage / OVERKILL_MAX));
-        float horizontalOverkillScale = MIN_HORIZONTAL_SCALE + (MAX_HORIZONTAL_SCALE - MIN_HORIZONTAL_SCALE) * overkillRatio;
+        // Calculate base scaling factors from overkill damage
+        float horizontalOverkillScale = calculateHorizontalScaling(overkillDamage);
+        float verticalOverkillScale = calculateVerticalScaling(overkillDamage);
+        float angularOverkillScale = calculateAngularScaling(overkillDamage);
 
-        // Calculate vertical scaling (tiered system)
-        float verticalOverkillScale;
+        // Apply weight modifiers to each velocity type
+        float horizontalMult = horizontalOverkillScale * calculateWeightMultiplier(weight.modifier, WEIGHT_HORIZONTAL_IMPACT);
+        float verticalMult = verticalOverkillScale * calculateWeightMultiplier(weight.modifier, WEIGHT_VERTICAL_IMPACT);
+        float angularMult = angularOverkillScale * calculateWeightMultiplier(weight.modifier, WEIGHT_ANGULAR_IMPACT);
+
+        return new VelocityModifiers(horizontalMult, verticalMult, angularMult);
+    }
+
+    // ================================
+    // SCALING CALCULATIONS
+    // ================================
+
+    /**
+     * Calculate horizontal velocity scaling (linear interpolation)
+     */
+    private static float calculateHorizontalScaling(float overkillDamage) {
+        float overkillRatio = Math.max(0f, Math.min(1f, overkillDamage / OVERKILL_MAX));
+        return MIN_HORIZONTAL_SCALE + (MAX_HORIZONTAL_SCALE - MIN_HORIZONTAL_SCALE) * overkillRatio;
+    }
+
+    /**
+     * Calculate vertical velocity scaling (tiered system)
+     */
+    private static float calculateVerticalScaling(float overkillDamage) {
         if (overkillDamage <= VERTICAL_TINY_THRESHOLD) {
             // 0-5 overkill: tiny hop
-            verticalOverkillScale = VERTICAL_TINY_HOP_SCALE;
+            return VERTICAL_TINY_HOP_SCALE;
         } else if (overkillDamage <= VERTICAL_SMALL_THRESHOLD) {
             // 6-19 overkill: interpolate from tiny to small
             float progress = (overkillDamage - VERTICAL_TINY_THRESHOLD) / (VERTICAL_SMALL_THRESHOLD - VERTICAL_TINY_THRESHOLD);
-            verticalOverkillScale = VERTICAL_TINY_HOP_SCALE + (VERTICAL_SMALL_HOP_SCALE - VERTICAL_TINY_HOP_SCALE) * progress;
+            return VERTICAL_TINY_HOP_SCALE + (VERTICAL_SMALL_HOP_SCALE - VERTICAL_TINY_HOP_SCALE) * progress;
         } else if (overkillDamage == OVERKILL_BASELINE) {
             // Exactly 20 overkill: baseline
-            verticalOverkillScale = VERTICAL_BASELINE_SCALE;
+            return VERTICAL_BASELINE_SCALE;
         } else if (overkillDamage < OVERKILL_BASELINE) {
             // 19.1-19.9 overkill: interpolate from small to baseline
             float progress = (overkillDamage - VERTICAL_SMALL_THRESHOLD) / (OVERKILL_BASELINE - VERTICAL_SMALL_THRESHOLD);
-            verticalOverkillScale = VERTICAL_SMALL_HOP_SCALE + (VERTICAL_BASELINE_SCALE - VERTICAL_SMALL_HOP_SCALE) * progress;
+            return VERTICAL_SMALL_HOP_SCALE + (VERTICAL_BASELINE_SCALE - VERTICAL_SMALL_HOP_SCALE) * progress;
         } else {
-            // 21-50 overkill: interpolate from baseline to max (capped at 1.3x)
+            // 21-50 overkill: interpolate from baseline to max
             float progress = Math.min(1f, (overkillDamage - OVERKILL_BASELINE) / (OVERKILL_MAX - OVERKILL_BASELINE));
-            verticalOverkillScale = VERTICAL_BASELINE_SCALE + (VERTICAL_MAX_SCALE - VERTICAL_BASELINE_SCALE) * progress;
+            return VERTICAL_BASELINE_SCALE + (VERTICAL_MAX_SCALE - VERTICAL_BASELINE_SCALE) * progress;
         }
-
-        // Calculate angular scaling (linear like horizontal)
-        float angularOverkillScale = MIN_ANGULAR_SCALE + (MAX_ANGULAR_SCALE - MIN_ANGULAR_SCALE) * overkillRatio;
-
-        // Get weight modifier
-        float weightScale = weight.modifier;
-
-        // Calculate final multipliers for each velocity type
-        float horizontalMult = horizontalOverkillScale * calculateWeightMultiplier(weightScale, WEIGHT_HORIZONTAL_IMPACT);
-        float verticalMult = verticalOverkillScale * calculateWeightMultiplier(weightScale, WEIGHT_VERTICAL_IMPACT);
-        float angularMult = angularOverkillScale * calculateWeightMultiplier(weightScale, WEIGHT_ANGULAR_IMPACT);
-
-        VelocityModifiers modifiers = new VelocityModifiers(horizontalMult, verticalMult, angularMult);
-
-        BaseMod.logger.info("Physics modifiers for " + monster.getClass().getSimpleName()
-                + " - overkill: " + String.format("%.1f", overkillDamage)
-                + " (h:" + String.format("%.2f", horizontalOverkillScale)
-                + ", v:" + String.format("%.2f", verticalOverkillScale)
-                + ", a:" + String.format("%.2f", angularOverkillScale) + ")"
-                + ", weight: " + weight.name() + " (" + String.format("%.1f", weightScale) + ")"
-                + ", result: " + modifiers);
-
-        return modifiers;
     }
 
+    /**
+     * Calculate angular velocity scaling (linear interpolation)
+     */
+    private static float calculateAngularScaling(float overkillDamage) {
+        float overkillRatio = Math.max(0f, Math.min(1f, overkillDamage / OVERKILL_MAX));
+        return MIN_ANGULAR_SCALE + (MAX_ANGULAR_SCALE - MIN_ANGULAR_SCALE) * overkillRatio;
+    }
+
+    // ================================
+    // HELPER METHODS
+    // ================================
+
+    /**
+     * Apply weight scaling with specified impact level
+     */
     private static float calculateWeightMultiplier(float weightScale, float weightImpact) {
-        // Apply weight scaling with the specified impact level
         return 1.0f + (weightScale - 1.0f) * weightImpact;
+    }
+
+    /**
+     * Get the weight classification for a monster
+     */
+    private static EnemyWeight getWeight(AbstractMonster monster) {
+        String monsterID = getMonsterID(monster);
+        return ENEMY_WEIGHTS.getOrDefault(monsterID, EnemyWeight.MEDIUM);
+    }
+
+    /**
+     * Get monster ID using reflection, fallback to class name
+     */
+    private static String getMonsterID(AbstractMonster monster) {
+        try {
+            Field idField = monster.getClass().getField("ID");
+            return (String) idField.get(null);
+        } catch (Exception e) {
+            return monster.getClass().getSimpleName();
+        }
     }
 }

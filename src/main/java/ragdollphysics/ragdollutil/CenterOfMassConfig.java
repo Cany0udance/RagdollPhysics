@@ -13,29 +13,36 @@ import com.megacrit.cardcrawl.monsters.exordium.*;
 import java.util.Arrays;
 import java.util.HashMap;
 
+/**
+ * Configuration for calculating center of mass offsets for monster ragdolls.
+ * Maps monsters to their primary body attachments and provides fallback calculations.
+ */
 public class CenterOfMassConfig {
-    // Control logging for center of mass calculations
-    private static boolean printCenterOfMassLogs = true; // Set to true to enable logs
 
-    // Map of monster class names to their specific body attachment names
+    // ================================
+    // MONSTER BODY ATTACHMENT MAPPING
+    // ================================
+
+    /** Maps monster IDs to their primary body attachment names */
     public static final HashMap<String, String[]> customBodyAttachments = new HashMap<>();
+
     static {
         customBodyAttachments.put(Cultist.ID, new String[]{"body"});
-        customBodyAttachments.put(SlaverBlue.ID, new String[]{"cloakblue"});
-        customBodyAttachments.put(SlaverRed.ID, new String[]{"cloackred"});
         customBodyAttachments.put(LouseNormal.ID, new String[]{"seg3"});
         customBodyAttachments.put(LouseDefensive.ID, new String[]{"seg3"});
+        customBodyAttachments.put(SlaverBlue.ID, new String[]{"cloakblue"});
+        customBodyAttachments.put(SlaverRed.ID, new String[]{"cloackred"});
         customBodyAttachments.put(Byrd.ID, new String[]{"flying/torso", "grounded/torso"});
-        customBodyAttachments.put(Exploder.ID, new String[]{"inside"});
         customBodyAttachments.put(BanditBear.ID, new String[]{"Torso"});
         customBodyAttachments.put(BanditLeader.ID, new String[]{"tunic"});
         customBodyAttachments.put(BanditPointy.ID, new String[]{"shirt"});
-        customBodyAttachments.put(SphericGuardian.ID, new String[]{"orb_main"});
         customBodyAttachments.put(Chosen.ID, new String[]{"skin"});
-        customBodyAttachments.put(ShelledParasite.ID, new String[]{"upperBody"});
-        customBodyAttachments.put(Lagavulin.ID, new String[]{"Shell1", "Shell2"});
         customBodyAttachments.put(Centurion.ID, new String[]{"chestArmor"});
         customBodyAttachments.put(Healer.ID, new String[]{"coat"});
+        customBodyAttachments.put(Exploder.ID, new String[]{"inside"});
+        customBodyAttachments.put(SphericGuardian.ID, new String[]{"orb_main"});
+        customBodyAttachments.put(ShelledParasite.ID, new String[]{"upperBody"});
+        customBodyAttachments.put(Lagavulin.ID, new String[]{"Shell1", "Shell2"});
         customBodyAttachments.put(Taskmaster.ID, new String[]{"middle"});
         customBodyAttachments.put(Nemesis.ID, new String[]{"cloak"});
         customBodyAttachments.put(WrithingMass.ID, new String[]{"leftMass"});
@@ -47,131 +54,86 @@ public class CenterOfMassConfig {
         customBodyAttachments.put(CorruptHeart.ID, new String[]{"cloak_fg"});
     }
 
-    // Calculate center of mass offset based on actual skeleton body bone position
-    public static CenterOffset calculateCenterOffset(Skeleton skeleton, String monsterClassName) {
-        if (printCenterOfMassLogs) {
-            BaseMod.logger.info("[CenterOfMass] === CALCULATE CENTER OFFSET CALLED ===");
-            BaseMod.logger.info("[CenterOfMass] Monster: '" + monsterClassName + "'");
-            BaseMod.logger.info("[CenterOfMass] Skeleton: " + (skeleton != null ? "NOT NULL" : "NULL"));
-        }
+    // ================================
+    // CENTER OFFSET CALCULATION
+    // ================================
 
+    /**
+     * Calculate center of mass offset based on skeleton body bone position
+     */
+    public static CenterOffset calculateCenterOffset(Skeleton skeleton, String monsterClassName) {
         if (skeleton == null) {
-            if (printCenterOfMassLogs) {
-                BaseMod.logger.warn("[CenterOfMass] Skeleton is NULL, returning zero offset");
-            }
             return new CenterOffset(0f, 0f);
         }
 
-        if (printCenterOfMassLogs) {
-            BaseMod.logger.info("[CenterOfMass] Skeleton has " + skeleton.getBones().size + " bones");
-        }
-
-        // Find the body bone (or similar)
+        // Find the primary body bone for this monster
         Bone bodyBone = findBodyBone(skeleton, monsterClassName);
         if (bodyBone != null) {
-            // The offset should position the physics center at the body bone's world position
+            // Position physics center at the body bone's world position
             float bodyWorldX = bodyBone.getWorldX() * Settings.scale;
             float bodyWorldY = bodyBone.getWorldY() * Settings.scale;
-            if (printCenterOfMassLogs) {
-                BaseMod.logger.info("[CenterOfMass] " + monsterClassName + " body bone '"
-                        + bodyBone.getData().getName() + "' at world pos: ("
-                        + String.format("%.1f", bodyWorldX) + ", " + String.format("%.1f", bodyWorldY) + ")");
-            }
             return new CenterOffset(bodyWorldX, bodyWorldY);
         } else {
-            // Fallback to static offsets if no body bone found
-            if (printCenterOfMassLogs) {
-                BaseMod.logger.warn("[CenterOfMass] No body bone found for " + monsterClassName + ", using fallback offset");
-            }
+            // Use static fallback offsets if no body bone found
             return getFallbackOffset(monsterClassName);
         }
     }
 
+    /**
+     * Find the primary body bone for a monster
+     */
     private static Bone findBodyBone(Skeleton skeleton, String monsterClassName) {
         if (skeleton == null) return null;
 
-        // Try custom attachments (now supporting multiple)
-        String[] customAttachments = customBodyAttachments.get(monsterClassName); // Fixed variable name
+        // Try monster-specific body attachments
+        String[] customAttachments = customBodyAttachments.get(monsterClassName);
         if (customAttachments != null) {
             for (String attachmentName : customAttachments) {
-                if (printCenterOfMassLogs) {
-                    BaseMod.logger.info("[CenterOfMass] Looking for bone associated with attachment: '" + attachmentName + "'");
-                }
-
+                // First try finding bone by attachment name
                 Bone boneFromAttachment = findBoneByAttachmentName(skeleton, attachmentName);
                 if (boneFromAttachment != null) {
-                    if (printCenterOfMassLogs) {
-                        BaseMod.logger.info("[CenterOfMass] Found bone '" + boneFromAttachment.getData().getName()
-                                + "' associated with attachment '" + attachmentName + "' for " + monsterClassName);
-                    }
                     return boneFromAttachment;
                 }
 
-                // Also try direct bone name fallback for this attachment
+                // Fallback to direct bone name search
                 Bone directBone = skeleton.findBone(attachmentName);
                 if (directBone != null) {
-                    if (printCenterOfMassLogs) {
-                        BaseMod.logger.info("[CenterOfMass] Found bone directly named '" + attachmentName + "'");
-                    }
                     return directBone;
                 }
             }
         }
 
-        // Fallback to generic body bone names
-        if (printCenterOfMassLogs) {
-            BaseMod.logger.info("[CenterOfMass] Trying default body bone names for " + monsterClassName);
-        }
+        // Final fallback to generic body bone names
         String[] defaultBodyBoneNames = {"body", "torso", "chest", "spine", "hip", "pelvis", "trunk"};
         for (String boneName : defaultBodyBoneNames) {
             Bone bone = skeleton.findBone(boneName);
             if (bone != null) {
-                if (printCenterOfMassLogs) {
-                    BaseMod.logger.info("[CenterOfMass] Found DEFAULT body-like bone for " + monsterClassName + ": " + boneName);
-                }
                 return bone;
             }
         }
 
-        if (printCenterOfMassLogs) {
-            BaseMod.logger.warn("[CenterOfMass] No suitable body bone found for " + monsterClassName);
-        }
         return null;
     }
 
-    // Find bone by searching for which bone has the specified attachment
+    /**
+     * Find bone by searching for which bone has the specified attachment
+     */
     private static Bone findBoneByAttachmentName(Skeleton skeleton, String attachmentName) {
-        if (printCenterOfMassLogs) {
-            BaseMod.logger.info("[CenterOfMass] Searching for bone with attachment: '" + attachmentName + "'");
-        }
-
-        // Search through all slots to find one with the matching attachment
         for (Slot slot : skeleton.getSlots()) {
             if (slot.getAttachment() != null) {
                 String slotAttachmentName = slot.getAttachment().getName();
-                if (printCenterOfMassLogs) {
-                    BaseMod.logger.info("[CenterOfMass] Checking slot '" + slot.getData().getName()
-                            + "' with attachment '" + slotAttachmentName + "' on bone '" + slot.getBone().getData().getName() + "'");
-                }
-
                 if (attachmentName.equals(slotAttachmentName)) {
-                    if (printCenterOfMassLogs) {
-                        BaseMod.logger.info("[CenterOfMass] MATCH! Found attachment '" + attachmentName
-                                + "' on bone '" + slot.getBone().getData().getName() + "'");
-                    }
                     return slot.getBone();
                 }
             }
         }
-
-        if (printCenterOfMassLogs) {
-            BaseMod.logger.warn("[CenterOfMass] No bone found with attachment: '" + attachmentName + "'");
-        }
         return null;
     }
 
+    /**
+     * Get fallback static offsets for monsters without clear body bones
+     */
     private static CenterOffset getFallbackOffset(String monsterClassName) {
-        // Fallback static offsets for monsters without clear body bones
         switch (monsterClassName) {
             case TheGuardian.ID:
                 return new CenterOffset(0f, -60f * Settings.scale);
@@ -180,19 +142,24 @@ public class CenterOfMassConfig {
         }
     }
 
-    // Updated method to add custom body attachment mapping
-    public static void setCustomBodyAttachment(String monsterClassName, String... attachmentNames) {
-        customBodyAttachments.put(monsterClassName, attachmentNames);
-        if (printCenterOfMassLogs) {
-            BaseMod.logger.info("[CenterOfMass] Set custom body attachments for " + monsterClassName + ": " + Arrays.toString(attachmentNames));
-        }
-    }
+    // ================================
+    // PUBLIC UTILITY METHODS
+    // ================================
 
-    // Public method to get the body attachment name for a monster (for debugging)
+    /**
+     * Get the body attachment names for a monster (for debugging)
+     */
     public static String[] getBodyAttachmentNames(String monsterClassName) {
         return customBodyAttachments.getOrDefault(monsterClassName, new String[]{"default search"});
     }
 
+    // ================================
+    // CENTER OFFSET DATA CLASS
+    // ================================
+
+    /**
+     * Represents a 2D offset for center of mass positioning
+     */
     public static class CenterOffset {
         public final float x;
         public final float y;

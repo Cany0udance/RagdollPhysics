@@ -15,52 +15,57 @@ import java.util.Set;
  * Determines viability based on skeleton structure, renderer availability, and previous failures.
  */
 public class RagdollValidator {
-    // Reflection fields for accessing monster internals
+
     private static Field imgField;
     private static Field skeletonField;
     private static Field srField;
-
-    // Validation state
-    private final String validatorId;
-    private int validationCount = 0;
 
     static {
         initializeReflectionFields();
     }
 
+
+    // ================================
+    // INSTANCE VARIABLES
+    // ================================
+
+    private final String validatorId;
+    private int validationCount = 0;
+
+
+    // ================================
+    // CONSTRUCTOR
+    // ================================
+
     public RagdollValidator() {
         this.validatorId = "Validator_" + System.currentTimeMillis() % 10000;
-        BaseMod.logger.info("[" + validatorId + "] RagdollValidator initialized");
     }
 
-    /**
-     * Initialize reflection fields for accessing monster components
-     */
+
+    // ================================
+    // REFLECTION INITIALIZATION
+    // ================================
+
+    /** Initialize reflection fields for accessing monster components */
     private static void initializeReflectionFields() {
         try {
             imgField = AbstractMonster.class.getDeclaredField("img");
             imgField.setAccessible(true);
-
             skeletonField = AbstractCreature.class.getDeclaredField("skeleton");
             skeletonField.setAccessible(true);
-
             srField = AbstractCreature.class.getDeclaredField("sr");
             srField.setAccessible(true);
-
-            BaseMod.logger.info("RagdollValidator reflection fields initialized successfully");
         } catch (Exception e) {
-            BaseMod.logger.error("Failed to initialize RagdollValidator reflection fields: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    /**
-     * Main validation method - determines if a monster can have ragdoll physics applied
-     *
-     * @param monster The monster to validate
-     * @param failedRagdolls Set of monsters that have previously failed ragdoll creation
-     * @return true if ragdoll is viable, false otherwise
-     */
+
+    // ================================
+    // MAIN VALIDATION METHODS
+    // ================================
+
+    /** Main validation method - determines if a monster can have ragdoll physics applied */
     public boolean isRagdollViable(AbstractMonster monster, Set<AbstractMonster> failedRagdolls) {
         validationCount++;
         String monsterName = monster.getClass().getSimpleName();
@@ -68,71 +73,47 @@ public class RagdollValidator {
         try {
             // Quick check: if this monster has failed before, don't try again
             if (failedRagdolls.contains(monster)) {
-                // Don't log repeatedly for failed monsters
                 return false;
             }
 
-            BaseMod.logger.info("[" + validatorId + "] Validating ragdoll viability for "
-                    + monsterName + " (validation #" + validationCount + ")");
-
             // Check if this is an image-based monster (special case)
             if (isImageBasedMonster(monster)) {
-                BaseMod.logger.info("[" + validatorId + "] " + monsterName
-                        + " is image-based, ragdoll viable");
                 return true;
             }
 
             // For skeleton-based monsters, validate skeleton components
             ValidationResult skeletonValidation = validateSkeletonComponents(monster);
-
-            if (skeletonValidation.isValid) {
-                BaseMod.logger.info("[" + validatorId + "] " + monsterName
-                        + " skeleton validation PASSED - " + skeletonValidation.details);
-                return true;
-            } else {
-                BaseMod.logger.info("[" + validatorId + "] " + monsterName
-                        + " skeleton validation FAILED - " + skeletonValidation.details);
+            if (!skeletonValidation.isValid) {
                 failedRagdolls.add(monster);
                 return false;
             }
 
+            return true;
+
         } catch (Exception e) {
-            BaseMod.logger.info("[" + validatorId + "] Ragdoll viability check failed for "
-                    + monsterName + ", using default death: " + e.getMessage());
             failedRagdolls.add(monster);
             return false;
         }
     }
 
-    /**
-     * Check if this is an image-based monster (has image but no skeleton)
-     */
+    /** Check if this is an image-based monster (has image but no skeleton) */
     public boolean isImageBasedMonster(AbstractMonster monster) {
         try {
             Texture img = getMonsterImage(monster);
             Skeleton skeleton = getMonsterSkeleton(monster);
-
-            boolean isImageBased = img != null && skeleton == null;
-
-            if (isImageBased) {
-                BaseMod.logger.info("[" + validatorId + "] " + monster.getClass().getSimpleName()
-                        + " detected as image-based monster");
-            }
-
-            return isImageBased;
+            return img != null && skeleton == null;
         } catch (Exception e) {
-            BaseMod.logger.info("[" + validatorId + "] Could not determine if "
-                    + monster.getClass().getSimpleName() + " is image-based: " + e.getMessage());
             return false;
         }
     }
 
-    /**
-     * Validate skeleton-based monster components
-     */
-    private ValidationResult validateSkeletonComponents(AbstractMonster monster) {
-        String monsterName = monster.getClass().getSimpleName();
 
+    // ================================
+    // SKELETON VALIDATION
+    // ================================
+
+    /** Validate skeleton-based monster components */
+    private ValidationResult validateSkeletonComponents(AbstractMonster monster) {
         try {
             // Check skeleton accessibility and validity
             Skeleton skeleton = getMonsterSkeleton(monster);
@@ -153,8 +134,7 @@ public class RagdollValidator {
             }
 
             // All checks passed
-            return ValidationResult.success("skeleton has " + skeleton.getBones().size
-                    + " bones, renderer exists");
+            return ValidationResult.success("skeleton has " + skeleton.getBones().size + " bones, renderer exists");
 
         } catch (IllegalAccessException e) {
             return ValidationResult.failure("Cannot access skeleton components: " + e.getMessage());
@@ -163,9 +143,12 @@ public class RagdollValidator {
         }
     }
 
-    /**
-     * Get monster's image texture via reflection
-     */
+
+    // ================================
+    // REFLECTION ACCESS METHODS
+    // ================================
+
+    /** Get monster's image texture via reflection */
     private Texture getMonsterImage(AbstractMonster monster) throws IllegalAccessException {
         if (imgField == null) {
             throw new IllegalAccessException("imgField not initialized");
@@ -173,9 +156,7 @@ public class RagdollValidator {
         return (Texture) imgField.get(monster);
     }
 
-    /**
-     * Get monster's skeleton via reflection
-     */
+    /** Get monster's skeleton via reflection */
     private Skeleton getMonsterSkeleton(AbstractMonster monster) throws IllegalAccessException {
         if (skeletonField == null) {
             throw new IllegalAccessException("skeletonField not initialized");
@@ -183,9 +164,7 @@ public class RagdollValidator {
         return (Skeleton) skeletonField.get(monster);
     }
 
-    /**
-     * Get monster's skeleton renderer via reflection
-     */
+    /** Get monster's skeleton renderer via reflection */
     private SkeletonRenderer getMonsterSkeletonRenderer(AbstractMonster monster) throws IllegalAccessException {
         if (srField == null) {
             throw new IllegalAccessException("srField not initialized");
@@ -193,25 +172,19 @@ public class RagdollValidator {
         return (SkeletonRenderer) srField.get(monster);
     }
 
-    /**
-     * Check if specific monster types are known to be problematic
-     * This can be expanded based on testing results
-     */
+
+    // ================================
+    // UTILITY METHODS
+    // ================================
+
+    /** Check if specific monster types are known to be problematic */
     public boolean isKnownProblematicMonster(AbstractMonster monster) {
         String monsterName = monster.getClass().getSimpleName();
-
-        // Add known problematic monster types here
-        // Example: some monsters might have complex custom rendering that conflicts
-        switch (monsterName) {
-            // Currently no known problematic monsters, but structure is here for future use
-            default:
-                return false;
-        }
+        // Add known problematic monster types here if needed
+        return false;
     }
 
-    /**
-     * Check if a monster has the minimum required components for ragdoll physics
-     */
+    /** Check if a monster has the minimum required components for ragdoll physics */
     public boolean hasMinimumRequiredComponents(AbstractMonster monster) {
         try {
             // Image-based monsters need at least an image
@@ -222,27 +195,24 @@ public class RagdollValidator {
             // Skeleton-based monsters need skeleton and renderer
             Skeleton skeleton = getMonsterSkeleton(monster);
             SkeletonRenderer renderer = getMonsterSkeletonRenderer(monster);
-
             return skeleton != null && renderer != null
                     && skeleton.getBones() != null && skeleton.getBones().size > 0;
-
         } catch (Exception e) {
-            BaseMod.logger.info("[" + validatorId + "] Error checking minimum components for "
-                    + monster.getClass().getSimpleName() + ": " + e.getMessage());
             return false;
         }
     }
 
-    /**
-     * Get validation statistics
-     */
+    /** Get validation statistics */
     public ValidationStats getStats() {
         return new ValidationStats(validationCount);
     }
 
-    /**
-     * Helper class to encapsulate validation results
-     */
+
+    // ================================
+    // HELPER CLASSES
+    // ================================
+
+    /** Helper class to encapsulate validation results */
     private static class ValidationResult {
         final boolean isValid;
         final String details;
@@ -261,9 +231,7 @@ public class RagdollValidator {
         }
     }
 
-    /**
-     * Statistics about validation operations
-     */
+    /** Statistics about validation operations */
     public static class ValidationStats {
         public final int totalValidations;
 

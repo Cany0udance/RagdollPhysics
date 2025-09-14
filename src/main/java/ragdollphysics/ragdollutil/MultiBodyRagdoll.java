@@ -25,21 +25,40 @@ import java.util.*;
  * Handles skeleton positioning, bone wobbles, and detached attachments.
  */
 public class MultiBodyRagdoll {
+
+    // ================================
+    // CORE PHYSICS COMPONENTS
+    // ================================
+
     public final HashMap<Bone, BoneWobble> boneWobbles;
     private final HashMap<String, AttachmentPhysics> attachmentBodies;
     public final RagdollPhysics mainBody;
-    private final float groundY;
-    private final AbstractMonster associatedMonster;
-    private static Texture debugSquareTexture = null;
-
-
     private final List<String> attachmentDrawOrder = new ArrayList<>();
 
-    // Fields for shadow fading
+
+    // ================================
+    // MONSTER AND POSITIONING DATA
+    // ================================
+
+    private final float groundY;
+    private final AbstractMonster associatedMonster;
+    private final String monsterClassName;
+    private final String ragdollId;
+
+    // Fixed relationship between physics center and visual center
+    private final float physicsToVisualOffsetX;
+    private final float physicsToVisualOffsetY;
+    private final float initialOffsetX;
+    private final float initialOffsetY;
+
+
+    // ================================
+    // VISUAL EFFECTS AND FADING
+    // ================================
+
     private static class FadeableSlot {
         final Slot slot;
         final float initialAlpha;
-
         FadeableSlot(Slot slot, float initialAlpha) {
             this.slot = slot;
             this.initialAlpha = initialAlpha;
@@ -50,35 +69,28 @@ public class MultiBodyRagdoll {
     private float fadeTimer = 0f;
     private static final float FADE_DURATION = 0.5f;
     private static final float SHADOW_FADE_DURATION = 0.5f;
-    // Add these fields to MultiBodyRagdoll class to track the relationship
-    private final float physicsToVisualOffsetX;
-    private final float physicsToVisualOffsetY;
 
-    private final float initialOffsetX;
-    private final float initialOffsetY;
+
+    // ================================
+    // PHYSICS CONFIGURATION
+    // ================================
+
     private static final float CEILING_Y = 1100f;
+    private static final float MIN_PHYSICS_TIMESTEP = 1.0f / 60.0f;
+    private static final float MAX_PHYSICS_TIMESTEP = 1.0f / 30.0f;
+    private static final float FIXED_TIMESTEP = 1.0f / 60.0f;
 
+    private float accumulator = 0f;
     private float settledTimer = 0f;
     public float totalRotationDegrees = 0f;
     public float lastRotation = 0f;
-    private static final float MIN_PHYSICS_TIMESTEP = 1.0f / 60.0f; // Minimum 60Hz
-    private static final float MAX_PHYSICS_TIMESTEP = 1.0f / 30.0f; // Don't go slower than 30Hz
-    private static final float FIXED_TIMESTEP = 1.0f / 60.0f;
-    private float accumulator = 0f;
-    private final String monsterClassName;
 
-    // Enhanced logging control
-    private final long creationTime;
-    public long lastLogTime = 0;
-    private int updateCount = 0;
-    private int physicsStepCount = 0;
-    private final String ragdollId;
-    private static boolean printFieldLogs = false; // Set to true to enable field discovery logs
-    public static boolean printInitializationLogs = false; // Set to true to enable detailed initialization logs
-    private static boolean printUpdateLogs = false; // Set to true to enable regular update logs
+
+    // ================================
+    // MONSTER-SPECIFIC CONFIGURATIONS
+    // ================================
+
     private final boolean allowsFreeRotation;
-
-    // Flag to indicate if this is an image-based ragdoll
     private final boolean isImageBased;
 
     private static final Set<String> FREE_ROTATION_ENEMIES = new HashSet<>();
@@ -92,19 +104,27 @@ public class MultiBodyRagdoll {
         FREE_ROTATION_ENEMIES.add(SpikeSlime_M.ID);
     }
 
-    // Helper class to store slot data for second pass
-    class SlotAttachmentData {
-        final Slot slot;
-        final String attachmentName;
-        final Bone bone;
 
-        SlotAttachmentData(Slot slot, String attachmentName, Bone bone) {
-            this.slot = slot;
-            this.attachmentName = attachmentName;
-            this.bone = bone;
-        }
-    }
+    // ================================
+    // DEBUG AND MONITORING
+    // ================================
 
+    private static Texture debugSquareTexture = null;
+    private final long creationTime;
+    public long lastLogTime = 0;
+    private int updateCount = 0;
+    private int physicsStepCount = 0;
+
+    private static boolean printFieldLogs = false;
+    public static boolean printInitializationLogs = false;
+    private static boolean printUpdateLogs = false;
+
+
+    // ================================
+    // CONSTRUCTORS
+    // ================================
+
+    /** Constructor for skeleton-based ragdolls */
     public MultiBodyRagdoll(Skeleton skeleton, float groundLevel, float startX, float startY,
                             String monsterClassName, AbstractMonster monster) {
         this.boneWobbles = new HashMap<>();
@@ -113,305 +133,162 @@ public class MultiBodyRagdoll {
         this.attachmentBodies = new HashMap<>();
         this.groundY = groundLevel;
         this.allowsFreeRotation = FREE_ROTATION_ENEMIES.contains(monsterClassName);
+        this.isImageBased = false;
 
-        // DYNAMIC CENTER OF MASS CALCULATION based on actual body bone
+        // Calculate dynamic center of mass correction
         CenterOfMassConfig.CenterOffset centerOffset = CenterOfMassConfig.calculateCenterOffset(skeleton, monsterClassName);
-
-        // Apply the correction to the main body physics center
         float correctedStartX = startX + centerOffset.x;
         float correctedStartY = startY + centerOffset.y;
 
         this.mainBody = new RagdollPhysics(correctedStartX, correctedStartY, 0, 0, groundLevel, monsterClassName);
 
-        // CRITICAL: Calculate the FIXED relationship between physics center and visual center
-        // This relationship should NEVER change during the simulation
+        // Establish fixed physics-visual relationship
         this.physicsToVisualOffsetX = (monster.drawX - correctedStartX);
         this.physicsToVisualOffsetY = (monster.drawY - correctedStartY);
-
-        // Store original offsets for reference (but we won't use these for positioning)
         this.initialOffsetX = monster.drawX - startX;
         this.initialOffsetY = monster.drawY - startY;
 
         this.creationTime = System.currentTimeMillis();
         this.ragdollId = "Ragdoll_" + System.currentTimeMillis() % 10000;
 
-        BaseMod.logger.info("[" + ragdollId + "] DEBUG: About to calculate center offset");
-        BaseMod.logger.info("[" + ragdollId + "] DEBUG: skeleton = " + (skeleton != null ? "NOT NULL" : "NULL"));
-        BaseMod.logger.info("[" + ragdollId + "] DEBUG: monsterClassName = '" + monsterClassName + "'");
-        BaseMod.logger.info("[" + ragdollId + "] DEBUG: SlaverBlue.ID = '" + SlaverBlue.ID + "'");
-        BaseMod.logger.info("[" + ragdollId + "] DEBUG: Returned center offset: " + centerOffset);
-        this.isImageBased = false;
-
-        // Log the FIXED relationship
-        if (printInitializationLogs) {
-            BaseMod.logger.info("[" + ragdollId + "] DYNAMIC PHYSICS-VISUAL RELATIONSHIP established:");
-            BaseMod.logger.info("[" + ragdollId + "] Physics center: (" + correctedStartX + ", " + correctedStartY + ")");
-            BaseMod.logger.info("[" + ragdollId + "] Visual center: (" + monster.drawX + ", " + monster.drawY + ")");
-            BaseMod.logger.info("[" + ragdollId + "] Fixed offset: (" + physicsToVisualOffsetX + ", " + physicsToVisualOffsetY + ")");
-            BaseMod.logger.info("[" + ragdollId + "] Dynamic center correction: " + centerOffset);
-        }
-
         this.fadeableSlots = findFadeableSlots(skeleton);
 
-        if (printInitializationLogs) {
-            BaseMod.logger.info("[" + ragdollId + "] Found " + fadeableSlots.size() + " fadeable slots");
-        }
+        // Initialize attachments and bone wobbles
+        initializeAttachments(skeleton, monster, startX, startY);
+        initializeBoneWobbles(skeleton);
+    }
 
-        if (printInitializationLogs) {
-            BaseMod.logger.info("[" + ragdollId + "] Creating dynamic ragdoll for "
-                    + monsterClassName + " at corrected (" + correctedStartX + ", " + correctedStartY
-                    + "), ground: " + groundLevel);
-            BaseMod.logger.info("[" + ragdollId + "] Skeleton has "
-                    + skeleton.getBones().size + " bones");
-        }
+    /** Constructor for image-based ragdolls (like Hexaghost) */
+    public MultiBodyRagdoll(float startX, float startY, float groundLevel,
+                            String monsterClassName, AbstractMonster monster) {
+        this.boneWobbles = new HashMap<>();
+        this.monsterClassName = monsterClassName;
+        this.associatedMonster = monster;
+        this.attachmentBodies = new HashMap<>();
+        this.groundY = groundLevel;
+        this.allowsFreeRotation = FREE_ROTATION_ENEMIES.contains(monsterClassName);
+        this.isImageBased = true;
 
-        // In MultiBodyRagdoll constructor, around line 120, replace this section:
+        // Apply center of mass correction for image-based ragdolls too
+        CenterOfMassConfig.CenterOffset centerOffset = CenterOfMassConfig.calculateCenterOffset(null, monsterClassName);
+        float correctedStartX = startX + centerOffset.x;
+        float correctedStartY = startY + centerOffset.y;
 
-        int attachmentCount = 0;
-// Get overkill damage for dismemberment calculations
-// Get overkill damage for dismemberment calculations
+        this.mainBody = new RagdollPhysics(correctedStartX, correctedStartY, 0, 0, groundLevel, monsterClassName);
+
+        // Establish fixed physics-visual relationship
+        this.physicsToVisualOffsetX = (monster.drawX - correctedStartX);
+        this.physicsToVisualOffsetY = (monster.drawY - correctedStartY);
+        this.initialOffsetX = monster.drawX - startX;
+        this.initialOffsetY = monster.drawY - startY;
+
+        this.creationTime = System.currentTimeMillis();
+        this.ragdollId = "ImageRagdoll_" + System.currentTimeMillis() % 10000;
+        this.fadeableSlots = new ArrayList<>();
+    }
+
+
+    // ================================
+    // INITIALIZATION METHODS
+    // ================================
+
+    /** Initialize attachment physics bodies with parent-child relationships */
+    private void initializeAttachments(Skeleton skeleton, AbstractMonster monster, float startX, float startY) {
         float overkillDamage = OverkillTracker.getOverkillDamage(monster);
-
-// Track created attachments for parent-child linking
         HashMap<String, AttachmentPhysics> parentAttachments = new HashMap<>();
         List<SlotAttachmentData> potentialChildren = new ArrayList<>();
 
-// FIRST PASS: Create parent attachments only
+        // First pass: Create parent attachments
         for (Slot slot : skeleton.getSlots()) {
             if (slot.getAttachment() != null) {
                 String attachmentName = slot.getAttachment().getName();
-                Bone bone = slot.getBone();
-
                 boolean shouldDetach = AttachmentConfig.shouldDetachAttachment(monsterClassName, attachmentName, overkillDamage);
 
                 if (shouldDetach) {
-                    // Calculate proper attachment position based on type
-                    float attachmentX, attachmentY;
-
-                    if (slot.getAttachment() instanceof RegionAttachment) {
-                        RegionAttachment regionAttachment = (RegionAttachment) slot.getAttachment();
-
-                        // Get the attachment's local offset relative to its bone
-                        float localX = regionAttachment.getX();
-                        float localY = regionAttachment.getY();
-
-                        // Apply bone transformation to the local offset
-                        float transformedX = bone.getA() * localX + bone.getB() * localY;
-                        float transformedY = bone.getC() * localX + bone.getD() * localY;
-
-                        // Final position: monster position + (bone world pos + transformed offset) * scale
-                        attachmentX = monster.drawX + (bone.getWorldX() + transformedX) * Settings.scale;
-                        attachmentY = monster.drawY + (bone.getWorldY() + transformedY) * Settings.scale;
-                    } else if (slot.getAttachment() instanceof MeshAttachment) {
-                        MeshAttachment meshAttachment = (MeshAttachment) slot.getAttachment();
-
-                        // Get the actual world vertices of the mesh
-                        float[] worldVertices = meshAttachment.updateWorldVertices(slot, false);
-
-                        // Calculate center point from the vertices
-                        float centerX = 0f;
-                        float centerY = 0f;
-                        int vertexCount = 0;
-
-                        for (int i = 0; i < worldVertices.length; i += 5) {
-                            centerX += worldVertices[i];     // x coordinate
-                            centerY += worldVertices[i + 1]; // y coordinate
-                            vertexCount++;
-                        }
-
-                        if (vertexCount > 0) {
-                            centerX /= vertexCount;
-                            centerY /= vertexCount;
-                        }
-
-                        attachmentX = centerX;
-                        attachmentY = centerY;
-
-                        if (printInitializationLogs) {
-                            BaseMod.logger.info("[" + ragdollId + "] MeshAttachment '" + attachmentName
-                                    + "' center calculated from " + vertexCount + " vertices: ("
-                                    + String.format("%.1f", attachmentX) + ", " + String.format("%.1f", attachmentY) + ")");
-                        }
-                    } else {
-                        // Fallback for other attachment types
-                        attachmentX = startX + bone.getWorldX() * Settings.scale;
-                        attachmentY = startY + bone.getWorldY() * Settings.scale;
-                    }
-
-                    // Create parent attachment with calculated position
+                    float[] position = calculateAttachmentPosition(slot, monster, startX, startY);
                     AttachmentPhysics parentAttachment = new AttachmentPhysics(
-                            attachmentX, attachmentY,
-                            groundLevel, bone, slot.getAttachment(), attachmentName);
+                            position[0], position[1], groundY, slot.getBone(),
+                            slot.getAttachment(), attachmentName);
 
                     parentAttachments.put(attachmentName.toLowerCase(), parentAttachment);
                     attachmentBodies.put(attachmentName, parentAttachment);
                     attachmentDrawOrder.add(attachmentName);
-                    attachmentCount++;
-
-                    if (printInitializationLogs) {
-                        String attachmentType = slot.getAttachment().getClass().getSimpleName();
-                        BaseMod.logger.info("[" + ragdollId + "] Created PARENT " + attachmentType
-                                + ": '" + attachmentName + "' on bone: " + bone.getData().getName()
-                                + " (overkill: " + String.format("%.1f", overkillDamage) + ")");
-                    }
                 } else {
-                    // Store for potential child processing
-                    potentialChildren.add(new SlotAttachmentData(slot, attachmentName, bone));
+                    potentialChildren.add(new SlotAttachmentData(slot, attachmentName, slot.getBone()));
                 }
             }
         }
 
-// SECOND PASS: Process potential child attachments for this specific monster
-        int childrenCreated = 0;
+        // Second pass: Create child attachments linked to parents
         for (SlotAttachmentData data : potentialChildren) {
-            String attachmentName = data.attachmentName;
-
-            // Find potential parent for this attachment using monster-specific rules
-            AttachmentPhysics parentAttachment = findParentForChild(monsterClassName, attachmentName, parentAttachments);
-
+            AttachmentPhysics parentAttachment = findParentForChild(monsterClassName, data.attachmentName, parentAttachments);
             if (parentAttachment != null) {
-                // Calculate proper attachment position based on type for child attachments too
-                float attachmentX, attachmentY;
-
-                if (data.slot.getAttachment() instanceof RegionAttachment) {
-                    RegionAttachment regionAttachment = (RegionAttachment) data.slot.getAttachment();
-
-                    // Get the attachment's local offset relative to its bone
-                    float localX = regionAttachment.getX();
-                    float localY = regionAttachment.getY();
-
-                    // Apply bone transformation to the local offset
-                    float transformedX = data.bone.getA() * localX + data.bone.getB() * localY;
-                    float transformedY = data.bone.getC() * localX + data.bone.getD() * localY;
-
-                    // Final position: monster position + (bone world pos + transformed offset) * scale
-                    attachmentX = monster.drawX + (data.bone.getWorldX() + transformedX) * Settings.scale;
-                    attachmentY = monster.drawY + (data.bone.getWorldY() + transformedY) * Settings.scale;
-                } else if (data.slot.getAttachment() instanceof MeshAttachment) {
-                    MeshAttachment meshAttachment = (MeshAttachment) data.slot.getAttachment();
-
-                    // Get the actual world vertices of the mesh
-                    float[] worldVertices = meshAttachment.updateWorldVertices(data.slot, false);
-
-                    // Calculate center point from the vertices
-                    float centerX = 0f;
-                    float centerY = 0f;
-                    int vertexCount = 0;
-
-                    for (int i = 0; i < worldVertices.length; i += 5) {
-                        centerX += worldVertices[i];     // x coordinate
-                        centerY += worldVertices[i + 1]; // y coordinate
-                        vertexCount++;
-                    }
-
-                    if (vertexCount > 0) {
-                        centerX /= vertexCount;
-                        centerY /= vertexCount;
-                    }
-
-                    attachmentX = centerX;
-                    attachmentY = centerY;
-
-                    if (printInitializationLogs) {
-                        BaseMod.logger.info("[" + ragdollId + "] Child MeshAttachment '" + attachmentName
-                                + "' center calculated from " + vertexCount + " vertices: ("
-                                + String.format("%.1f", attachmentX) + ", " + String.format("%.1f", attachmentY) + ")");
-                    }
-                } else {
-                    // Fallback for other attachment types
-                    attachmentX = startX + data.bone.getWorldX() * Settings.scale;
-                    attachmentY = startY + data.bone.getWorldY() * Settings.scale;
-                }
-
-                // Create child attachment linked to parent with calculated position
+                float[] position = calculateAttachmentPosition(data.slot, monster, startX, startY);
                 AttachmentPhysics childAttachment = new AttachmentPhysics(
-                        attachmentX, attachmentY,
-                        groundLevel, data.bone, data.slot.getAttachment(), attachmentName,
-                        parentAttachment); // Link to parent
+                        position[0], position[1], groundY, data.bone,
+                        data.slot.getAttachment(), data.attachmentName, parentAttachment);
 
-                attachmentBodies.put(attachmentName, childAttachment);
-                attachmentDrawOrder.add(attachmentName);
-                attachmentCount++;
-                childrenCreated++;
-
-                if (printInitializationLogs) {
-                    String attachmentType = data.slot.getAttachment().getClass().getSimpleName();
-                    BaseMod.logger.info("[" + ragdollId + "] Created CHILD " + attachmentType
-                            + ": '" + attachmentName + "' linked to '" + parentAttachment.getAttachmentName()
-                            + "' for monster " + monsterClassName);
-                }
+                attachmentBodies.put(data.attachmentName, childAttachment);
+                attachmentDrawOrder.add(data.attachmentName);
             }
         }
+    }
 
-        if (printInitializationLogs && childrenCreated > 0) {
-            BaseMod.logger.info("[" + ragdollId + "] Parent-child creation complete for " + monsterClassName
-                    + " - Parents: " + parentAttachments.size() + ", Children: " + childrenCreated);
+    /** Calculate proper position for an attachment based on its type */
+    private float[] calculateAttachmentPosition(Slot slot, AbstractMonster monster, float startX, float startY) {
+        Bone bone = slot.getBone();
+
+        if (slot.getAttachment() instanceof RegionAttachment) {
+            RegionAttachment regionAttachment = (RegionAttachment) slot.getAttachment();
+            float localX = regionAttachment.getX();
+            float localY = regionAttachment.getY();
+            float transformedX = bone.getA() * localX + bone.getB() * localY;
+            float transformedY = bone.getC() * localX + bone.getD() * localY;
+            return new float[]{
+                    monster.drawX + (bone.getWorldX() + transformedX) * Settings.scale,
+                    monster.drawY + (bone.getWorldY() + transformedY) * Settings.scale
+            };
+        } else if (slot.getAttachment() instanceof MeshAttachment) {
+            MeshAttachment meshAttachment = (MeshAttachment) slot.getAttachment();
+            float[] worldVertices = meshAttachment.updateWorldVertices(slot, false);
+            float centerX = 0f, centerY = 0f;
+            int vertexCount = 0;
+            for (int i = 0; i < worldVertices.length; i += 5) {
+                centerX += worldVertices[i];
+                centerY += worldVertices[i + 1];
+                vertexCount++;
+            }
+            if (vertexCount > 0) {
+                centerX /= vertexCount;
+                centerY /= vertexCount;
+            }
+            return new float[]{centerX, centerY};
+        } else {
+            // Fallback for other attachment types
+            return new float[]{
+                    startX + bone.getWorldX() * Settings.scale,
+                    startY + bone.getWorldY() * Settings.scale
+            };
         }
+    }
 
-        if (printInitializationLogs) {
-            BaseMod.logger.info("[" + ragdollId + "] Created " + attachmentCount + " attachment physics bodies");
-        }
-
-        // Initialize bone wobbles for remaining bones
+    /** Initialize bone wobbles for all skeleton bones */
+    private void initializeBoneWobbles(Skeleton skeleton) {
         for (Bone bone : skeleton.getBones()) {
             boneWobbles.put(bone, new BoneWobble(bone.getRotation(), bone));
         }
     }
 
 
+    // ================================
+    // FADEABLE SLOTS MANAGEMENT
+    // ================================
 
-
-    // Constructor for image-based ragdolls (like Hexaghost)
-    public MultiBodyRagdoll(float startX, float startY, float groundLevel,
-                            String monsterClassName, AbstractMonster monster) {
-        this.boneWobbles = new HashMap<>(); // Empty for image ragdolls
-        this.monsterClassName = monsterClassName;
-        this.associatedMonster = monster;
-        this.attachmentBodies = new HashMap<>(); // Empty for image ragdolls
-        this.groundY = groundLevel;
-        this.allowsFreeRotation = FREE_ROTATION_ENEMIES.contains(monsterClassName);
-
-
-        // GET CENTER OF MASS CORRECTION for image-based ragdolls too
-        CenterOfMassConfig.CenterOffset centerOffset = CenterOfMassConfig.calculateCenterOffset(null, monsterClassName);
-
-        // Apply the correction to the main body physics center
-        float correctedStartX = startX + centerOffset.x;
-        float correctedStartY = startY + centerOffset.y;
-
-        this.mainBody = new RagdollPhysics(correctedStartX, correctedStartY, 0, 0, groundLevel, monsterClassName);
-
-        // CRITICAL: Calculate the FIXED relationship between physics center and visual center
-        this.physicsToVisualOffsetX = (monster.drawX - correctedStartX);
-        this.physicsToVisualOffsetY = (monster.drawY - correctedStartY);
-
-        this.creationTime = System.currentTimeMillis();
-        this.ragdollId = "ImageRagdoll_" + System.currentTimeMillis() % 10000;
-        this.isImageBased = true;
-
-        // Store the offset between monster draw position and original physics body start position (for reference)
-        this.initialOffsetX = monster.drawX - startX;
-        this.initialOffsetY = monster.drawY - startY;
-
-// No fadeable parts for image-based ragdolls
-        this.fadeableSlots = new ArrayList<>();
-
-        // Log the FIXED relationship for image ragdolls too
-        if (printInitializationLogs) {
-            BaseMod.logger.info("[" + ragdollId + "] FIXED PHYSICS-VISUAL RELATIONSHIP established (IMAGE-BASED):");
-            BaseMod.logger.info("[" + ragdollId + "] Physics center: (" + correctedStartX + ", " + correctedStartY + ")");
-            BaseMod.logger.info("[" + ragdollId + "] Visual center: (" + monster.drawX + ", " + monster.drawY + ")");
-            BaseMod.logger.info("[" + ragdollId + "] Fixed offset: (" + physicsToVisualOffsetX + ", " + physicsToVisualOffsetY + ")");
-            BaseMod.logger.info("[" + ragdollId + "] Center correction applied: " + centerOffset);
-        }
-    }
-
-    // ADD these new helper methods to your MultiBodyRagdoll class:
-
+    /** Find slots that should fade out over time (shadows, etc.) */
     private List<FadeableSlot> findFadeableSlots(Skeleton skeleton) {
         List<FadeableSlot> fadeableSlots = new ArrayList<>();
 
-        // Always check for shadow (existing behavior)
+        // Always check for shadow
         Slot shadowSlot = findShadowSlot(skeleton);
         if (shadowSlot != null) {
             fadeableSlots.add(new FadeableSlot(shadowSlot, shadowSlot.getColor().a));
@@ -422,13 +299,8 @@ public class MultiBodyRagdoll {
         if (fadeableParts != null) {
             for (String partName : fadeableParts) {
                 Slot partSlot = findSlotByPartName(skeleton, partName);
-                if (partSlot != null && partSlot != shadowSlot) { // Don't duplicate shadow
+                if (partSlot != null && partSlot != shadowSlot) {
                     fadeableSlots.add(new FadeableSlot(partSlot, partSlot.getColor().a));
-
-                    if (printInitializationLogs) {
-                        BaseMod.logger.info("[" + ragdollId + "] Found fadeable part: "
-                                + partName + " in slot: " + partSlot.getData().getName());
-                    }
                 }
             }
         }
@@ -465,11 +337,9 @@ public class MultiBodyRagdoll {
     }
 
     private Slot findSlotByPartName(Skeleton skeleton, String partName) {
-        // First try to find slot by name
         Slot slot = skeleton.findSlot(partName);
         if (slot != null) return slot;
 
-        // Then try to find by attachment name
         for (Slot s : skeleton.getSlots()) {
             if (s.getAttachment() != null) {
                 String attachmentName = s.getAttachment().getName().toLowerCase();
@@ -479,7 +349,6 @@ public class MultiBodyRagdoll {
             }
         }
 
-        // Finally try slot name contains
         for (Slot s : skeleton.getSlots()) {
             if (s.getData().getName().toLowerCase().contains(partName.toLowerCase())) {
                 return s;
@@ -489,262 +358,88 @@ public class MultiBodyRagdoll {
         return null;
     }
 
-    public boolean isProperlyInitialized() {
-        return mainBody != null && (isImageBased || (!boneWobbles.isEmpty()));
-    }
 
-    public boolean canLog() {
-        if (!printUpdateLogs) {
-            return false; // Disable all update logging if flag is false
-        }
+    // ================================
+    // MAIN UPDATE LOOP
+    // ================================
 
-        long currentTime = System.currentTimeMillis();
-        long timeSinceCreation = currentTime - creationTime;
-
-        // Enhanced logging during critical periods
-        if (timeSinceCreation < 200) { // Extended initial logging
-            return true;
-        }
-
-        // Log major state changes
-        if (updateCount % 60 == 0) { // Every second at 60fps
-            return true;
-        }
-
-        // Log when physics events occur
-        return (currentTime - lastLogTime) >= 100 || MathUtils.random() < 0.03f;
-    }
-
+    /** Main update method called each frame */
     public void update(float deltaTime) {
         updateCount++;
 
+        // Update fade timer
         if (!fadeableSlots.isEmpty() && fadeTimer < FADE_DURATION) {
             fadeTimer += deltaTime;
         }
 
-        if (canLog()) {
-            BaseMod.logger.info("[" + ragdollId + "] === UPDATE " + updateCount + " ===");
-            BaseMod.logger.info("[" + ragdollId + "] DeltaTime: " + deltaTime + ", Accumulator: " + accumulator);
-            BaseMod.logger.info("[" + ragdollId + "] MainBody: pos("
-                    + String.format("%.1f", mainBody.x) + ", "
-                    + String.format("%.1f", mainBody.y) + "), vel("
-                    + String.format("%.1f", mainBody.velocityX) + ", "
-                    + String.format("%.1f", mainBody.velocityY)
-                    + "), rot: " + String.format("%.1f", mainBody.rotation)
-                    + ", angVel: " + String.format("%.1f", mainBody.angularVelocity));
-            lastLogTime = System.currentTimeMillis();
-        }
-
-        // Clamp deltaTime to prevent huge timesteps that break physics
+        // Clamp deltaTime to prevent physics instability
         deltaTime = Math.min(deltaTime, MAX_PHYSICS_TIMESTEP);
-
-        // Calculate adaptive timestep - smaller timesteps for higher framerates
         float physicsTimestep = Math.max(deltaTime, MIN_PHYSICS_TIMESTEP);
-
         accumulator += deltaTime;
-        int steps = 0;
 
+        // Run physics steps
+        int steps = 0;
         while (accumulator >= physicsTimestep) {
             steps++;
             physicsStepCount++;
             updatePhysics(physicsTimestep);
             accumulator -= physicsTimestep;
-
-            // Recalculate timestep each iteration in case frame rate changed
             physicsTimestep = Math.max(MIN_PHYSICS_TIMESTEP, accumulator);
 
             if (steps > 10) { // Prevent infinite loops
-                BaseMod.logger.warn("[" + ragdollId + "] Breaking physics loop after "
-                        + steps + " steps");
                 accumulator = 0;
                 break;
             }
         }
-
-        if (steps > 0 && printUpdateLogs && canLog()) {
-            BaseMod.logger.info("[" + ragdollId + "] Executed " + steps
-                    + " physics steps with timestep " + String.format("%.4f", physicsTimestep)
-                    + " (total: " + physicsStepCount + ")");
-        }
     }
 
+    /** Update all physics components */
     private void updatePhysics(float deltaTime) {
         mainBody.update(deltaTime, this);
 
         // Update attachments
-        int activeAttachments = 0;
         for (AttachmentPhysics attachment : attachmentBodies.values()) {
             attachment.update(deltaTime);
-            if (Math.abs(attachment.velocityX) + Math.abs(attachment.velocityY) > 10f) {
-                activeAttachments++;
-            }
         }
 
+        // Update bone wobbles
         boolean parentHasSettled = hasSettledOnGround();
         for (BoneWobble wobble : boneWobbles.values()) {
-            wobble.update(deltaTime, mainBody.velocityX, mainBody.velocityY,
-                    parentHasSettled, this);
+            wobble.update(deltaTime, mainBody.velocityX, mainBody.velocityY, parentHasSettled, this);
         }
     }
 
-    // Add a method to handle image-based positioning with fixed relationship
-    public void applyToImage(AbstractMonster monster) {
-        // For image-based ragdolls, we need to update the monster's drawX/drawY
-        // to maintain the fixed relationship with the physics center
-        monster.drawX = mainBody.x + physicsToVisualOffsetX;
-        monster.drawY = mainBody.y + physicsToVisualOffsetY;
 
-        // Apply rotation if the monster supports it
-        // (You might need to store rotation in a field that the image renderer uses)
+    // ================================
+    // SKELETON POSITIONING AND ROTATION
+    // ================================
 
-        if (updateCount % 180 == 0 && canLog()) {
-            BaseMod.logger.info("[" + ragdollId + "] IMAGE SYNC CHECK - Physics: ("
-                    + String.format("%.1f", mainBody.x) + ", " + String.format("%.1f", mainBody.y)
-                    + ") -> Visual: (" + String.format("%.1f", monster.drawX) + ", " + String.format("%.1f", monster.drawY)
-                    + "), offset: (" + String.format("%.1f", physicsToVisualOffsetX) + ", "
-                    + String.format("%.1f", physicsToVisualOffsetY) + ")");
-            lastLogTime = System.currentTimeMillis();
-        }
-    }
-
-    // Helper method to find parent attachment for a potential child (monster-specific)
-    private AttachmentPhysics findParentForChild(String monsterName, String childName,
-                                                 HashMap<String, AttachmentPhysics> parentAttachments) {
-
-        // Check each parent attachment to see if this child should belong to it
-        for (Map.Entry<String, AttachmentPhysics> entry : parentAttachments.entrySet()) {
-            String parentName = entry.getValue().getAttachmentName();
-
-            // Use monster-specific child attachment checking
-            if (AttachmentConfig.isChildAttachment(monsterName, parentName, childName)) {
-                if (printInitializationLogs) {
-                    BaseMod.logger.info("[" + ragdollId + "] Found parent '" + parentName
-                            + "' for child '" + childName + "' in monster " + monsterName);
-                }
-                return entry.getValue();
-            }
-        }
-
-        return null;
-    }
-
-    public boolean hasSettledOnGround() {
-        return mainBody.hasSettledOnGround();
-    }
-
-    public void applyGlobalForce(float forceX, float forceY) {
-        BaseMod.logger.info("[" + ragdollId + "] APPLYING GLOBAL FORCE: ("
-                + forceX + ", " + forceY + ")");
-
-        if (canLog()) {
-            BaseMod.logger.info("[" + ragdollId + "] Before force - vel: ("
-                    + String.format("%.1f", mainBody.velocityX) + ", "
-                    + String.format("%.1f", mainBody.velocityY) + "), angVel: "
-                    + String.format("%.1f", mainBody.angularVelocity));
-            lastLogTime = System.currentTimeMillis();
-        }
-
-        // GET PHYSICS MODIFIERS - This is the key addition
-        PhysicsModifier.VelocityModifiers modifiers = PhysicsModifier.calculateModifiers(associatedMonster);
-
-        // Apply modified forces to main body
-        mainBody.velocityX += forceX * 0.8f * modifiers.horizontalMultiplier;
-        mainBody.velocityY += forceY * 0.8f * modifiers.verticalMultiplier;
-        lastRotation = mainBody.rotation;
-
-        // Calculate angular velocity with modifiers
-        float upwardVelocity = Math.max(0, mainBody.velocityY);
-        float flipIntensity = Math.min(upwardVelocity / 1200f, 0.5f);
-        float baseAngularVel = MathUtils.random(-72f, 72f); // Change this to give enemies more rotation
-        mainBody.angularVelocity += baseAngularVel * (1.0f + flipIntensity * 0.3f) * modifiers.angularMultiplier;
-
-        if (canLog()) {
-            BaseMod.logger.info("[" + ragdollId + "] After modified force - vel: ("
-                    + String.format("%.1f", mainBody.velocityX) + ", "
-                    + String.format("%.1f", mainBody.velocityY)
-                    + "), angVel: " + String.format("%.1f", mainBody.angularVelocity)
-                    + ", modifiers: " + modifiers);
-            lastLogTime = System.currentTimeMillis();
-        }
-
-        // Apply modifiers to attachments
-        int attachmentsAffected = 0;
-        for (AttachmentPhysics attachment : attachmentBodies.values()) {
-            // Apply horizontal force with modifiers
-            attachment.velocityX += forceX * MathUtils.random(0.5f, 1.2f) * modifiers.horizontalMultiplier;
-            attachment.velocityY += forceY * MathUtils.random(0.4f, 1.0f) * modifiers.verticalMultiplier;
-
-            // Apply angular velocity with modifiers
-            float attachmentBaseAngular = MathUtils.random(-360f, 360f);
-            attachment.angularVelocity += attachmentBaseAngular * (1.0f + flipIntensity * 0.5f) * modifiers.angularMultiplier;
-
-            // Random variation (also affected by horizontal modifier for X component)
-            attachment.velocityX += MathUtils.random(-75f, 75f) * modifiers.horizontalMultiplier;
-            attachment.velocityY += MathUtils.random(-50f, 100f) * modifiers.verticalMultiplier;
-
-            attachmentsAffected++;
-        }
-
-        // Apply modifiers to bone wobbles
-        for (BoneWobble wobble : boneWobbles.values()) {
-            wobble.angularVelocity += MathUtils.random(-90f, 90f) * (1.0f + flipIntensity * 0.5f) * modifiers.angularMultiplier;
-        }
-
-        if (canLog()) {
-            BaseMod.logger.info("[" + ragdollId + "] Modified global force complete - affected " + attachmentsAffected
-                    + " attachments and " + boneWobbles.size() + " bone wobbles");
-            lastLogTime = System.currentTimeMillis();
-        }
-    }
-
-    // Update the applyToBones method to rotate around the body bone
+    /** Apply physics state to skeleton bones */
     public void applyToBones(Skeleton skeleton, AbstractMonster monster) {
-        // Find the body bone that we're using as the center of mass
         Bone bodyBone = findBodyBone(skeleton);
 
         if (bodyBone != null) {
-            // BODY-CENTERED POSITIONING AND ROTATION
-
-            // Calculate where the body bone should be in world space
+            // Body-centered positioning and rotation
             float targetBodyWorldX = mainBody.x;
             float targetBodyWorldY = mainBody.y;
-
-            // Get current body bone world position relative to skeleton origin
             float currentBodyOffsetX = bodyBone.getWorldX() * Settings.scale;
             float currentBodyOffsetY = bodyBone.getWorldY() * Settings.scale;
 
-            // Position skeleton so that body bone ends up at physics center
             skeleton.setPosition(
                     targetBodyWorldX - currentBodyOffsetX,
                     targetBodyWorldY - currentBodyOffsetY
             );
 
-            // Apply rotation to the body bone instead of root bone
+            // Apply rotation to body bone
             float normalizedRotation = mainBody.rotation % 360f;
             if (normalizedRotation < 0) normalizedRotation += 360f;
-
-            // Set the body bone's rotation to match physics rotation
             bodyBone.setRotation(bodyBone.getData().getRotation() + normalizedRotation);
-
-            // Log positioning every so often
-            if (updateCount % 120 == 0 && canLog()) {
-                BaseMod.logger.info("[" + ragdollId + "] BODY-CENTERED positioning:");
-                BaseMod.logger.info("[" + ragdollId + "] - Physics center: (" + String.format("%.1f", mainBody.x) + ", " + String.format("%.1f", mainBody.y) + ")");
-                BaseMod.logger.info("[" + ragdollId + "] - Body bone '" + bodyBone.getData().getName() + "' offset: (" + String.format("%.1f", currentBodyOffsetX) + ", " + String.format("%.1f", currentBodyOffsetY) + ")");
-                BaseMod.logger.info("[" + ragdollId + "] - Skeleton positioned at: (" + String.format("%.1f", skeleton.getX()) + ", " + String.format("%.1f", skeleton.getY()) + ")");
-                BaseMod.logger.info("[" + ragdollId + "] - Applied rotation: " + String.format("%.1f", normalizedRotation) + "°");
-                lastLogTime = System.currentTimeMillis();
-            }
-
         } else {
-            // FALLBACK: Use root bone method if no body bone found
-            BaseMod.logger.warn("[" + ragdollId + "] No body bone found, falling back to root bone rotation");
-
+            // Fallback: use root bone method
             skeleton.setPosition(
                     mainBody.x + physicsToVisualOffsetX,
                     mainBody.y + physicsToVisualOffsetY
             );
-
             if (skeleton.getRootBone() != null) {
                 float normalizedRotation = mainBody.rotation % 360f;
                 if (normalizedRotation < 0) normalizedRotation += 360f;
@@ -752,81 +447,234 @@ public class MultiBodyRagdoll {
             }
         }
 
+        // Apply fading to fadeable slots
         for (FadeableSlot fadeableSlot : fadeableSlots) {
             float fadeProgress = Math.min(1f, fadeTimer / FADE_DURATION);
             fadeableSlot.slot.getColor().a = fadeableSlot.initialAlpha * (1f - fadeProgress);
         }
 
-        int hiddenAttachments = 0;
-        int wobbledBones = 0;
-
-        // Apply bone wobbles
+        // Apply bone wobbles and hide detached attachments
         for (Bone bone : skeleton.getBones()) {
             BoneWobble wobble = boneWobbles.get(bone);
             if (wobble != null) {
                 bone.setRotation(bone.getData().getRotation() + wobble.rotation);
-                wobbledBones++;
             }
         }
 
-        // Hide detached attachments
+        // Hide original attachments that are now physics bodies
         for (Slot slot : skeleton.getSlots()) {
             if (slot.getAttachment() != null) {
                 String attachmentName = slot.getAttachment().getName();
-
                 if (attachmentBodies.containsKey(attachmentName)) {
                     slot.setAttachment(null);
-                    hiddenAttachments++;
-
-                    if (updateCount % 60 == 0 && canLog()) {
-                        BaseMod.logger.info("[" + ragdollId + "] Hiding original attachment: " + attachmentName);
-                    }
                 }
             }
         }
 
-        if (updateCount % 120 == 0 && canLog()) {
-            BaseMod.logger.info("[" + ragdollId + "] Bones applied - hidden attachments: " + hiddenAttachments
-                    + ", wobbled bones: " + wobbledBones + ", body-centered positioning active");
-            lastLogTime = System.currentTimeMillis();
-        }
-
         skeleton.updateWorldTransform();
 
-        // Re-check body bone position after world transform update
+        // Re-apply rotation after world transform update
         if (bodyBone != null) {
-            // Re-apply rotation to body bone after updateWorldTransform
             float normalizedRotation = mainBody.rotation % 360f;
             if (normalizedRotation < 0) normalizedRotation += 360f;
             bodyBone.setRotation(bodyBone.getData().getRotation() + normalizedRotation);
         } else if (skeleton.getRootBone() != null) {
-            // Fallback: re-apply to root bone
             float normalizedRotation = mainBody.rotation % 360f;
             if (normalizedRotation < 0) normalizedRotation += 360f;
             skeleton.getRootBone().setRotation(normalizedRotation);
         }
     }
 
-    // Updated helper method to find body bone (same logic as in CenterOfMassConfig)
+    /** Apply physics positioning to image-based ragdolls */
+    public void applyToImage(AbstractMonster monster) {
+        monster.drawX = mainBody.x + physicsToVisualOffsetX;
+        monster.drawY = mainBody.y + physicsToVisualOffsetY;
+    }
+
+
+    // ================================
+    // FORCE APPLICATION
+    // ================================
+
+    /** Apply forces to all physics bodies with monster-specific modifiers */
+    public void applyGlobalForce(float forceX, float forceY) {
+        PhysicsModifier.VelocityModifiers modifiers = PhysicsModifier.calculateModifiers(associatedMonster);
+
+        // Apply modified forces to main body
+        mainBody.velocityX += forceX * 0.8f * modifiers.horizontalMultiplier;
+        mainBody.velocityY += forceY * 0.8f * modifiers.verticalMultiplier;
+
+        lastRotation = mainBody.rotation;
+
+        // Calculate angular velocity with modifiers
+        float upwardVelocity = Math.max(0, mainBody.velocityY);
+        float flipIntensity = Math.min(upwardVelocity / 1200f, 0.5f);
+        float baseAngularVel = MathUtils.random(-72f, 72f);
+        mainBody.angularVelocity += baseAngularVel * (1.0f + flipIntensity * 0.3f) * modifiers.angularMultiplier;
+
+        // Apply modifiers to attachments
+        for (AttachmentPhysics attachment : attachmentBodies.values()) {
+            attachment.velocityX += forceX * MathUtils.random(0.5f, 1.2f) * modifiers.horizontalMultiplier;
+            attachment.velocityY += forceY * MathUtils.random(0.4f, 1.0f) * modifiers.verticalMultiplier;
+
+            float attachmentBaseAngular = MathUtils.random(-360f, 360f);
+            attachment.angularVelocity += attachmentBaseAngular * (1.0f + flipIntensity * 0.5f) * modifiers.angularMultiplier;
+
+            attachment.velocityX += MathUtils.random(-75f, 75f) * modifiers.horizontalMultiplier;
+            attachment.velocityY += MathUtils.random(-50f, 100f) * modifiers.verticalMultiplier;
+        }
+
+        // Apply modifiers to bone wobbles
+        for (BoneWobble wobble : boneWobbles.values()) {
+            wobble.angularVelocity += MathUtils.random(-90f, 90f) * (1.0f + flipIntensity * 0.5f) * modifiers.angularMultiplier;
+        }
+    }
+
+
+    // ================================
+    // ATTACHMENT RENDERING
+    // ================================
+
+    /** Render detached attachments with proper scaling and positioning */
+    public void renderDetachedAttachments(PolygonSpriteBatch sb, TextureAtlas atlas, AbstractMonster monster) {
+        // Store and set proper blend function
+        int srcFunc = sb.getBlendSrcFunc();
+        int dstFunc = sb.getBlendDstFunc();
+        if (srcFunc != GL20.GL_SRC_ALPHA || dstFunc != GL20.GL_ONE_MINUS_SRC_ALPHA) {
+            sb.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        }
+
+        // Skip if monster has completely faded
+        Color monsterColor = monster.tint.color;
+        if (monsterColor.a <= 0) {
+            return;
+        }
+
+        // Render attachments in draw order
+        for (String attachmentName : attachmentDrawOrder) {
+            AttachmentPhysics attachmentPhysics = attachmentBodies.get(attachmentName);
+            if (attachmentPhysics == null) continue;
+
+            Color currentColor = sb.getColor();
+            sb.setColor(monsterColor);
+
+            renderSingleAttachment(sb, atlas, attachmentPhysics, attachmentName);
+            sb.setColor(currentColor);
+        }
+
+        // Restore original blend function
+        if (srcFunc != GL20.GL_SRC_ALPHA || dstFunc != GL20.GL_ONE_MINUS_SRC_ALPHA) {
+            sb.setBlendFunction(srcFunc, dstFunc);
+        }
+    }
+
+    /** Render a single attachment with proper scaling */
+    private void renderSingleAttachment(PolygonSpriteBatch sb, TextureAtlas atlas,
+                                        AttachmentPhysics attachmentPhysics, String attachmentName) {
+        boolean rendered = false;
+
+        if (attachmentPhysics.attachment != null) {
+            try {
+                if (attachmentPhysics.attachment instanceof RegionAttachment) {
+                    rendered = renderRegionAttachment(sb, (RegionAttachment) attachmentPhysics.attachment, attachmentPhysics);
+                } else if (attachmentPhysics.attachment instanceof MeshAttachment) {
+                    rendered = renderMeshAttachment(sb, (MeshAttachment) attachmentPhysics.attachment, attachmentPhysics, attachmentName);
+                }
+            } catch (Exception e) {
+                // Silent fallback to atlas rendering
+            }
+        }
+
+        // Fallback: render from atlas
+        if (!rendered) {
+            TextureAtlas.AtlasRegion region = atlas.findRegion(attachmentName);
+            if (region != null) {
+                float[] dimensions = AttachmentScaleConfig.calculateRenderDimensions(
+                        monsterClassName, region.getRegionWidth(), region.getRegionHeight(),
+                        attachmentPhysics.originalScaleX, attachmentPhysics.originalScaleY);
+
+                sb.draw(region,
+                        attachmentPhysics.x - dimensions[0] / 2f,
+                        attachmentPhysics.y - dimensions[1] / 2f,
+                        dimensions[0] / 2f, dimensions[1] / 2f,
+                        dimensions[0], dimensions[1],
+                        1f, 1f, attachmentPhysics.rotation);
+            }
+        }
+    }
+
+    private boolean renderRegionAttachment(PolygonSpriteBatch sb, RegionAttachment regionAttachment, AttachmentPhysics physics) {
+        TextureAtlas.AtlasRegion region = (TextureAtlas.AtlasRegion) regionAttachment.getRegion();
+        if (region == null) return false;
+
+        float[] dimensions = AttachmentScaleConfig.calculateRenderDimensions(
+                monsterClassName, region.getRegionWidth(), region.getRegionHeight(),
+                physics.originalScaleX, physics.originalScaleY);
+
+        float finalWidth = dimensions[0] * Math.abs(regionAttachment.getScaleX());
+        float finalHeight = dimensions[1] * Math.abs(regionAttachment.getScaleY());
+
+        float scaleMultiplier = AttachmentScaleConfig.getAttachmentScaleMultiplier(monsterClassName);
+        float offsetX = regionAttachment.getX() * regionAttachment.getScaleX() * scaleMultiplier * Settings.scale;
+        float offsetY = regionAttachment.getY() * regionAttachment.getScaleY() * scaleMultiplier * Settings.scale;
+
+        sb.draw(region,
+                physics.x - finalWidth / 2f + offsetX,
+                physics.y - finalHeight / 2f + offsetY,
+                finalWidth / 2f, finalHeight / 2f,
+                finalWidth, finalHeight,
+                1f, 1f, physics.rotation + regionAttachment.getRotation());
+
+        return true;
+    }
+
+    private boolean renderMeshAttachment(PolygonSpriteBatch sb, MeshAttachment meshAttachment,
+                                         AttachmentPhysics physics, String attachmentName) {
+        TextureAtlas.AtlasRegion region = (TextureAtlas.AtlasRegion) meshAttachment.getRegion();
+        if (region == null) return false;
+
+        float[] dimensions = AttachmentScaleConfig.calculateRenderDimensions(
+                monsterClassName, region.getRegionWidth(), region.getRegionHeight(),
+                physics.originalScaleX, physics.originalScaleY);
+
+        float finalRotation = physics.rotation;
+        if (region.rotate && monsterClassName.equals(Sentry.ID) &&
+                (attachmentName.contains("top") || attachmentName.contains("bottom"))) {
+            finalRotation -= 90f;
+        }
+
+        sb.draw(region,
+                physics.x - dimensions[0] / 2f,
+                physics.y - dimensions[1] / 2f,
+                dimensions[0] / 2f, dimensions[1] / 2f,
+                dimensions[0], dimensions[1],
+                1f, 1f, finalRotation);
+
+        return true;
+    }
+
+
+    // ================================
+    // HELPER METHODS
+    // ================================
+
     private Bone findBodyBone(Skeleton skeleton) {
         if (skeleton == null) return null;
-        // Use the same logic as CenterOfMassConfig for consistency
+
         String[] customBodyAttachments = CenterOfMassConfig.customBodyAttachments.get(monsterClassName);
         if (customBodyAttachments != null) {
             for (String attachmentName : customBodyAttachments) {
-                // First try to find bone by attachment name
                 Bone boneFromAttachment = findBoneByAttachmentName(skeleton, attachmentName);
                 if (boneFromAttachment != null) {
                     return boneFromAttachment;
                 }
-                // Fallback: try the attachment name as a direct bone name
                 Bone directBone = skeleton.findBone(attachmentName);
                 if (directBone != null) {
                     return directBone;
                 }
             }
         }
-        // Fallback to generic names
+
         String[] bodyBoneNames = {"body", "torso", "chest", "spine", "hip", "pelvis", "trunk"};
         for (String boneName : bodyBoneNames) {
             Bone bone = skeleton.findBone(boneName);
@@ -834,12 +682,11 @@ public class MultiBodyRagdoll {
                 return bone;
             }
         }
+
         return null;
     }
 
-    // Helper method to find bone by attachment name (same as in CenterOfMassConfig)
     private Bone findBoneByAttachmentName(Skeleton skeleton, String attachmentName) {
-        // Search through all slots to find one with the matching attachment
         for (Slot slot : skeleton.getSlots()) {
             if (slot.getAttachment() != null) {
                 String slotAttachmentName = slot.getAttachment().getName();
@@ -851,169 +698,47 @@ public class MultiBodyRagdoll {
         return null;
     }
 
-    public void renderDetachedAttachments(PolygonSpriteBatch sb, TextureAtlas atlas, AbstractMonster monster) {
-        int attachmentsRendered = 0;
-        int attachmentsFailed = 0;
-
-        // Store the current blend function
-        int srcFunc = sb.getBlendSrcFunc();
-        int dstFunc = sb.getBlendDstFunc();
-
-        // Set proper blend function for alpha blending (if not already set)
-        if (srcFunc != GL20.GL_SRC_ALPHA || dstFunc != GL20.GL_ONE_MINUS_SRC_ALPHA) {
-            sb.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-        }
-
-        // Get monster's current tint color for synchronized fading
-        Color monsterColor = monster.tint.color;
-
-        // Skip all attachment rendering if monster has completely faded
-        if (monsterColor.a <= 0) {
-            return;
-        }
-
-        // Log scale override being used
-        if (updateCount % 300 == 0 && canLog() && AttachmentScaleConfig.hasCustomScale(monsterClassName)) {
-            BaseMod.logger.info("[" + ragdollId + "] Using custom scale multiplier for " + monsterClassName
-                    + ": " + AttachmentScaleConfig.getAttachmentScaleMultiplier(monsterClassName));
-        }
-
-        // Render attachments in their original slot order
-        for (String attachmentName : attachmentDrawOrder) {
-            AttachmentPhysics attachmentPhysics = attachmentBodies.get(attachmentName);
-            if (attachmentPhysics == null) continue;
-
-            boolean rendered = false;
-            Color currentColor = sb.getColor();
-            sb.setColor(monsterColor);
-
-            if (attachmentPhysics.attachment != null) {
-                try {
-                    // Handle RegionAttachment with monster-specific scaling
-                    if (attachmentPhysics.attachment instanceof RegionAttachment) {
-                        RegionAttachment regionAttachment = (RegionAttachment) attachmentPhysics.attachment;
-                        TextureAtlas.AtlasRegion region = (TextureAtlas.AtlasRegion) regionAttachment.getRegion();
-
-                        if (region != null) {
-                            float regionPixelWidth = region.getRegionWidth();
-                            float regionPixelHeight = region.getRegionHeight();
-                            float attachmentScaleX = regionAttachment.getScaleX();
-                            float attachmentScaleY = regionAttachment.getScaleY();
-                            float attachmentRotation = regionAttachment.getRotation();
-
-                            // Use the new scale calculation method
-                            float[] dimensions = AttachmentScaleConfig.calculateRenderDimensions(
-                                    monsterClassName, regionPixelWidth, regionPixelHeight,
-                                    attachmentPhysics.originalScaleX, attachmentPhysics.originalScaleY);
-
-                            float finalWidth = dimensions[0] * Math.abs(attachmentScaleX);
-                            float finalHeight = dimensions[1] * Math.abs(attachmentScaleY);
-
-                            // Apply monster-specific scaling to offsets too
-                            float scaleMultiplier = AttachmentScaleConfig.getAttachmentScaleMultiplier(monsterClassName);
-                            float offsetX = regionAttachment.getX() * attachmentScaleX * scaleMultiplier * Settings.scale;
-                            float offsetY = regionAttachment.getY() * attachmentScaleY * scaleMultiplier * Settings.scale;
-
-                            sb.draw(region, attachmentPhysics.x - finalWidth / 2f + offsetX,
-                                    attachmentPhysics.y - finalHeight / 2f + offsetY,
-                                    finalWidth / 2f, finalHeight / 2f, finalWidth, finalHeight,
-                                    1f, 1f, attachmentPhysics.rotation + attachmentRotation);
-
-                            rendered = true;
-                            attachmentsRendered++;
-
-                            // Debug log for Guardian scaling
-                            if (monsterClassName.equals(TheGuardian.ID) && updateCount % 300 == 0 && canLog()) {
-                                BaseMod.logger.info("[" + ragdollId + "] Guardian attachment '" + attachmentName
-                                        + "' - base: " + regionPixelWidth + "x" + regionPixelHeight
-                                        + " -> final: " + String.format("%.1f", finalWidth) + "x" + String.format("%.1f", finalHeight)
-                                        + " (scale: " + scaleMultiplier + ")");
-                            }
-                        }
-                    }
-                    // Handle MeshAttachment with monster-specific scaling
-                    else if (attachmentPhysics.attachment instanceof MeshAttachment) {
-                        MeshAttachment meshAttachment = (MeshAttachment) attachmentPhysics.attachment;
-                        TextureAtlas.AtlasRegion region = (TextureAtlas.AtlasRegion) meshAttachment.getRegion();
-
-                        if (region != null) {
-                            float baseWidth = region.getRegionWidth();
-                            float baseHeight = region.getRegionHeight();
-
-                            // Use the new scale calculation method
-                            float[] dimensions = AttachmentScaleConfig.calculateRenderDimensions(
-                                    monsterClassName, baseWidth, baseHeight,
-                                    attachmentPhysics.originalScaleX, attachmentPhysics.originalScaleY);
-
-                            float width = dimensions[0];
-                            float height = dimensions[1];
-
-                            float finalRotation = attachmentPhysics.rotation;
-
-                            if (region.rotate) {
-                                if (monsterClassName.equals(Sentry.ID)
-                                        && (attachmentName.contains("top")
-                                        || attachmentName.contains("bottom"))) {
-                                    finalRotation -= 90f;
-                                }
-                            }
-
-                            sb.draw(region, attachmentPhysics.x - width / 2f,
-                                    attachmentPhysics.y - height / 2f, width / 2f, height / 2f,
-                                    width, height, 1f, 1f, finalRotation);
-
-                            rendered = true;
-                            attachmentsRendered++;
-                        }
-                    }
-                } catch (Exception e) {
-                    BaseMod.logger.error("[" + ragdollId + "] Failed to render attachment '"
-                            + attachmentName + "': " + e.getMessage());
-                    attachmentsFailed++;
-                }
+    private AttachmentPhysics findParentForChild(String monsterName, String childName,
+                                                 HashMap<String, AttachmentPhysics> parentAttachments) {
+        for (Map.Entry<String, AttachmentPhysics> entry : parentAttachments.entrySet()) {
+            String parentName = entry.getValue().getAttachmentName();
+            if (AttachmentConfig.isChildAttachment(monsterName, parentName, childName)) {
+                return entry.getValue();
             }
-
-            // Fallback rendering with custom scaling
-            if (!rendered) {
-                TextureAtlas.AtlasRegion region = atlas.findRegion(attachmentName);
-                if (region != null) {
-                    float baseWidth = region.getRegionWidth();
-                    float baseHeight = region.getRegionHeight();
-
-                    // Use the new scale calculation method
-                    float[] dimensions = AttachmentScaleConfig.calculateRenderDimensions(
-                            monsterClassName, baseWidth, baseHeight,
-                            attachmentPhysics.originalScaleX, attachmentPhysics.originalScaleY);
-
-                    float width = dimensions[0];
-                    float height = dimensions[1];
-
-                    sb.draw(region, attachmentPhysics.x - width / 2f,
-                            attachmentPhysics.y - height / 2f, width / 2f, height / 2f,
-                            width, height, 1f, 1f, attachmentPhysics.rotation);
-                    attachmentsRendered++;
-                } else {
-                    attachmentsFailed++;
-                }
-            }
-
-            sb.setColor(currentColor);
         }
+        return null;
+    }
 
-        // Restore original blend function if we changed it
-        if (srcFunc != GL20.GL_SRC_ALPHA || dstFunc != GL20.GL_ONE_MINUS_SRC_ALPHA) {
-            sb.setBlendFunction(srcFunc, dstFunc);
-        }
+    public boolean canLog() {
+        if (!printUpdateLogs) return false;
+        long currentTime = System.currentTimeMillis();
+        long timeSinceCreation = currentTime - creationTime;
+        return timeSinceCreation < 200 || updateCount % 60 == 0 ||
+                (currentTime - lastLogTime) >= 100 || MathUtils.random() < 0.03f;
+    }
 
-        if (updateCount % 300 == 0 && canLog()
-                && (attachmentsRendered > 0 || attachmentsFailed > 0)) {
-            BaseMod.logger.info("[" + ragdollId + "] Attachment render summary - rendered: " + attachmentsRendered
-                    + ", failed: " + attachmentsFailed
-                    + ", monster alpha: " + String.format("%.2f", monsterColor.a)
-                    + (AttachmentScaleConfig.hasCustomScale(monsterClassName) ?
-                    ", custom scale: " + AttachmentScaleConfig.getAttachmentScaleMultiplier(monsterClassName) : ""));
-            lastLogTime = System.currentTimeMillis();
+    class SlotAttachmentData {
+        final Slot slot;
+        final String attachmentName;
+        final Bone bone;
+        SlotAttachmentData(Slot slot, String attachmentName, Bone bone) {
+            this.slot = slot;
+            this.attachmentName = attachmentName;
+            this.bone = bone;
         }
+    }
+
+
+    // ================================
+    // PUBLIC UTILITY METHODS
+    // ================================
+
+    public boolean isProperlyInitialized() {
+        return mainBody != null && (isImageBased || (!boneWobbles.isEmpty()));
+    }
+
+    public boolean hasSettledOnGround() {
+        return mainBody.hasSettledOnGround();
     }
 
     public float getCenterX() {
@@ -1027,6 +752,8 @@ public class MultiBodyRagdoll {
     public float getAverageRotation() {
         return mainBody.rotation;
     }
+
+    // Getters for various properties
     public float getPhysicsToVisualOffsetX() { return physicsToVisualOffsetX; }
     public float getPhysicsToVisualOffsetY() { return physicsToVisualOffsetY; }
     public AbstractMonster getAssociatedMonster() { return associatedMonster; }
@@ -1035,12 +762,6 @@ public class MultiBodyRagdoll {
     public boolean isImageBased() { return isImageBased; }
     public String getRagdollId() { return ragdollId; }
     public int getUpdateCount() { return updateCount; }
-    public boolean getAllowsFreeRotation() {
-        return allowsFreeRotation;
-    }
-
-    public String getMonsterClassName() {
-        return monsterClassName;
-    }
-
+    public boolean getAllowsFreeRotation() { return allowsFreeRotation; }
+    public String getMonsterClassName() { return monsterClassName; }
 }
