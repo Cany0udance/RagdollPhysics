@@ -120,10 +120,23 @@ public class AttachmentConfig {
                 "rightarmfg6", "rightarmfg7", "rightarmfg8", "rightarmfg9", "rightarmfg10"
         });
 
+        MONSTER_ATTACHMENTS.put("Defect", new String[] {
+                "Eye_down", "Eye_up", "crackedOrb", "head",
+                "left_arm", "left_finger_1", "left_finger_2", "left_finger_3", "left_foot", "left_forearm", "left_quad", "left_shin", "left_thumb",
+                "mantle", "mantle_behind",
+                "right_arm", "right_finger_1", "right_finger_2", "right_foot", "right_forearm", "right_hand", "right_quad", "right_shin", "right_thumb",
+                "wire_main_neck", "wire_neck_l", "wire_neck_l2", "wire_neck_r",
+                "wires_body_l_bg", "wires_body_l_fg", "wires_body_r"
+        });
+
         MONSTER_ATTACHMENTS.put(BronzeAutomaton.ID, new String[] {
                 "abdomen", "armLeft", "armRight", "chest", "footleft", "footright",
                 "forearmLeft", "forearmRight", "handRight", "quadLeft", "quadRight",
                 "shoulderLeft", "shoulderRight", "thighleft", "thighright"
+        });
+
+        MONSTER_ATTACHMENTS.put("TheSilent", new String[] {
+                "kris"
         });
     }
 

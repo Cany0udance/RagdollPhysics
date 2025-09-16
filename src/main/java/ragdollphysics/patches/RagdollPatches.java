@@ -13,7 +13,9 @@ import com.megacrit.cardcrawl.core.AbstractCreature;
 import com.megacrit.cardcrawl.dungeons.AbstractDungeon;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
 import com.megacrit.cardcrawl.screens.DeathScreen;
-import ragdollphysics.actions.PlayerDeathRagdollAction;
+
+import ragdollphysics.actions.PlayerRagdollWaitAction;
+import ragdollphysics.effects.PlayerRagdollVFX;
 import ragdollphysics.ragdollutil.OverkillTracker;
 import ragdollphysics.ragdollutil.RagdollManager;
 
@@ -148,19 +150,16 @@ public class RagdollPatches {
     public static class HealthBarUpdatePatch {
         @SpirePostfixPatch
         public static void postfix(AbstractCreature __instance) {
-            // Only trigger for players who just hit 0 health
             if (__instance instanceof AbstractPlayer) {
                 AbstractPlayer player = (AbstractPlayer) __instance;
 
-                // Check if player just died (health is 0 and they're marked as dead)
                 if (player.currentHealth <= 0) {
-                    BaseMod.logger.info("[HealthBarUpdatePatch] Player health hit 0, queuing ragdoll action");
+                    BaseMod.logger.info("[HealthBarUpdatePatch] Player health hit 0, creating VFX and action");
 
-                    // Add the ragdoll action to the TOP of the action queue
-                    // This will pause all other actions until the ragdoll settles
-                    AbstractDungeon.actionManager.addToTop(
-                            new PlayerDeathRagdollAction(player, ragdollManager)
-                    );
+                    AbstractDungeon.effectsQueue.add(new PlayerRagdollVFX(player, ragdollManager));
+                    AbstractDungeon.actionManager.addToTop(new PlayerRagdollWaitAction(player, ragdollManager));
+
+                    BaseMod.logger.info("[HealthBarUpdatePatch] VFX and action queued");
                 }
             }
         }

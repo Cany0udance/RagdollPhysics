@@ -555,9 +555,9 @@ public class MultiBodyRagdoll {
 
     /** Render detached attachments - now works with any AbstractCreature */
     public void renderDetachedAttachments(PolygonSpriteBatch sb, TextureAtlas atlas, AbstractCreature entity) {
-        BaseMod.logger.info("=== RENDER ATTACHMENTS DEBUG ===");
-        BaseMod.logger.info("Entity: " + entityClassName + " | Attachment count: " + attachmentBodies.size());
-        BaseMod.logger.info("Entity tint alpha: " + entity.tint.color.a);
+      //  BaseMod.logger.info("=== RENDER ATTACHMENTS DEBUG ===");
+     //   BaseMod.logger.info("Entity: " + entityClassName + " | Attachment count: " + attachmentBodies.size());
+     //   BaseMod.logger.info("Entity tint alpha: " + entity.tint.color.a);
 
         // Store and set proper blend function
         int srcFunc = sb.getBlendSrcFunc();
@@ -581,8 +581,8 @@ public class MultiBodyRagdoll {
                 continue;
             }
 
-            BaseMod.logger.info("Rendering attachment: " + attachmentName +
-                    " at (" + attachmentPhysics.x + ", " + attachmentPhysics.y + ")");
+         //   BaseMod.logger.info("Rendering attachment: " + attachmentName +
+         //           " at (" + attachmentPhysics.x + ", " + attachmentPhysics.y + ")");
 
             Color currentColor = sb.getColor();
             sb.setColor(entityColor);
@@ -591,7 +591,7 @@ public class MultiBodyRagdoll {
             sb.setColor(currentColor);
         }
 
-        BaseMod.logger.info("=== END RENDER DEBUG ===");
+      //  BaseMod.logger.info("=== END RENDER DEBUG ===");
 
         // Restore original blend function
         if (srcFunc != GL20.GL_SRC_ALPHA || dstFunc != GL20.GL_ONE_MINUS_SRC_ALPHA) {

@@ -55,6 +55,9 @@ public class CenterOfMassConfig {
         customBodyAttachments.put(TimeEater.ID, new String[]{"cloak_fg"});
         customBodyAttachments.put(CorruptHeart.ID, new String[]{"cloak_fg"});
         customBodyAttachments.put("Watcher", new String[]{"robe_upper"});
+        customBodyAttachments.put("The_Silent", new String[]{"body"});
+        customBodyAttachments.put("Ironclad", new String[]{"shirt"});
+        customBodyAttachments.put("Defect", new String[]{"crackedOrb"});
     }
 
     // ================================
@@ -107,7 +110,7 @@ public class CenterOfMassConfig {
         }
 
         // Final fallback to generic body bone names
-        String[] defaultBodyBoneNames = {"body", "torso", "chest", "spine", "hip", "pelvis", "trunk"};
+        String[] defaultBodyBoneNames = {"body", "torso", "chest", "spine", "hip", "pelvis", "trunk", "shirt"};
         for (String boneName : defaultBodyBoneNames) {
             Bone bone = skeleton.findBone(boneName);
             if (bone != null) {

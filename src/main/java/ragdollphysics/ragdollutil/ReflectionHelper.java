@@ -99,13 +99,10 @@ public class ReflectionHelper {
      * Get creature's skeleton
      */
     public Skeleton getSkeleton(AbstractCreature creature) throws IllegalAccessException {
-        BaseMod.logger.info("[ReflectionHelper] getSkeleton called for " + creature.getClass().getSimpleName());
         if (skeletonField == null) {
-            BaseMod.logger.info("[ReflectionHelper] ERROR: skeletonField not initialized");
             throw new IllegalAccessException("skeletonField not initialized");
         }
         Skeleton result = (Skeleton) skeletonField.get(creature);
-        BaseMod.logger.info("[ReflectionHelper] Retrieved skeleton: " + (result != null ? "present" : "null"));
         return result;
     }
 
