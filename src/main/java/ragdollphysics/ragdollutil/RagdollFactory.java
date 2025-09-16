@@ -146,8 +146,8 @@ public class RagdollFactory {
             float customGroundLevel = calculateGroundLevel(monster);
 
             return new MultiBodyRagdoll(
-                    monster.drawX,
-                    monster.drawY,
+                    monster.hb.cX,
+                    monster.hb.cY,
                     customGroundLevel,
                     monster.id,
                     monster
