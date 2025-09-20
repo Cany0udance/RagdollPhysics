@@ -138,6 +138,11 @@ public class AttachmentConfig {
         MONSTER_ATTACHMENTS.put("TheSilent", new String[] {
                 "kris"
         });
+
+        // The Pilot
+        MONSTER_ATTACHMENTS.put("MyCharacter", new String[] {
+                "tube", "legs", "feet", "hand", "hand2", "shoulder", "torso", "shoulder 2"
+        });
     }
 
     /**

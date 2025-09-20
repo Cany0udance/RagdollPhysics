@@ -87,6 +87,7 @@ public class MultiBodyRagdoll {
     public float totalRotationDegrees = 0f;
     public float lastRotation = 0f;
 
+    private HashMap<Bone, Float> deathPoseRotations = new HashMap<>();
 
     // ================================
     // MONSTER-SPECIFIC CONFIGURATIONS
@@ -126,12 +127,13 @@ public class MultiBodyRagdoll {
     // CONSTRUCTORS
     // ================================
 
-    /** Constructor for skeleton-based ragdolls - now supports both monsters and players */
+
+    /** Constructor for skeleton-based ragdolls - now captures current bone poses */
     public MultiBodyRagdoll(Skeleton skeleton, float groundLevel, float startX, float startY,
                             String entityClassName, AbstractCreature entity) {
         this.boneWobbles = new HashMap<>();
         this.entityClassName = entityClassName;
-        this.associatedEntity = entity; // Changed from associatedMonster
+        this.associatedEntity = entity;
         this.attachmentBodies = new HashMap<>();
         this.groundY = groundLevel;
         this.allowsFreeRotation = FREE_ROTATION_ENEMIES.contains(entityClassName);
@@ -155,10 +157,16 @@ public class MultiBodyRagdoll {
 
         this.fadeableSlots = findFadeableSlots(skeleton);
 
+        // IMPORTANT: Update world transform to get current bone states
+        skeleton.updateWorldTransform();
+
+        captureDeathPose(skeleton);
+
         // Initialize attachments and bone wobbles
         initializeAttachments(skeleton, entity, startX, startY);
-        initializeBoneWobbles(skeleton);
+        initializeBoneWobblesWithCurrentPose(skeleton); // Changed method name
     }
+
 
     /** Constructor for image-based ragdolls - now supports both monsters and players */
     public MultiBodyRagdoll(float startX, float startY, float groundLevel,
@@ -290,12 +298,15 @@ public class MultiBodyRagdoll {
         }
     }
 
-    /** Initialize bone wobbles for all skeleton bones */
-    private void initializeBoneWobbles(Skeleton skeleton) {
+    /** Initialize bone wobbles using current skeleton pose instead of bind pose */
+    private void initializeBoneWobblesWithCurrentPose(Skeleton skeleton) {
         for (Bone bone : skeleton.getBones()) {
-            boneWobbles.put(bone, new BoneWobble(bone.getRotation(), bone));
+            // Use current rotation instead of data rotation
+            float currentRotation = bone.getRotation();
+            boneWobbles.put(bone, new BoneWobble(currentRotation, bone, true)); // New constructor parameter
         }
     }
+
 
 
     // ================================
@@ -471,11 +482,17 @@ public class MultiBodyRagdoll {
             fadeableSlot.slot.getColor().a = fadeableSlot.initialAlpha * (1f - fadeProgress);
         }
 
-        // Apply bone wobbles and hide detached attachments
+        // Apply bone wobbles - MODIFIED to preserve original pose
+// Apply bone wobbles and hide detached attachments
         for (Bone bone : skeleton.getBones()) {
             BoneWobble wobble = boneWobbles.get(bone);
             if (wobble != null) {
-                bone.setRotation(bone.getData().getRotation() + wobble.rotation);
+                Float deathRotation = deathPoseRotations.get(bone);
+                if (deathRotation != null) {
+                    bone.setRotation(deathRotation + wobble.rotation);
+                } else {
+                    bone.setRotation(bone.getData().getRotation() + wobble.rotation);
+                }
             }
         }
 
@@ -502,7 +519,6 @@ public class MultiBodyRagdoll {
             skeleton.getRootBone().setRotation(normalizedRotation);
         }
     }
-
     /** Apply physics positioning to image-based ragdolls - now works with any AbstractCreature */
     public void applyToImage(AbstractCreature entity) {
         entity.drawX = mainBody.x + physicsToVisualOffsetX;
@@ -775,7 +791,6 @@ public class MultiBodyRagdoll {
         return true;
     }
 
-
     // ================================
     // HELPER METHODS
     // ================================
@@ -838,6 +853,15 @@ public class MultiBodyRagdoll {
         return timeSinceCreation < 200 || updateCount % 60 == 0 ||
                 (currentTime - lastLogTime) >= 100 || MathUtils.random() < 0.03f;
     }
+
+    private void captureDeathPose(Skeleton skeleton) {
+        skeleton.updateWorldTransform();
+
+        for (Bone bone : skeleton.getBones()) {
+            deathPoseRotations.put(bone, bone.getRotation());
+        }
+    }
+
 
     class SlotAttachmentData {
         final Slot slot;

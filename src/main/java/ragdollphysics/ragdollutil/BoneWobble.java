@@ -52,7 +52,7 @@ public class BoneWobble {
 
     public float rotation = 0f;
     public float angularVelocity = 0f;
-    private final float originalRotation;
+    public final float originalRotation;
 
     // ================================
     // BONE PROPERTIES
@@ -89,20 +89,22 @@ public class BoneWobble {
     // CONSTRUCTOR
     // ================================
 
-    public BoneWobble(float initialRotation, Bone bone) {
-        this.originalRotation = initialRotation;
+    public BoneWobble(float initialRotation, Bone bone, boolean useCurrentPose) {
+        // If useCurrentPose is true, use the initialRotation as both original and starting rotation
+        // If false, use the old behavior for backward compatibility
+        this.originalRotation = useCurrentPose ? initialRotation : bone.getData().getRotation();
+        this.rotation = useCurrentPose ? 0f : 0f; // Always start wobble at 0, let applyToBones handle the offset
         this.bone = bone;
         this.wobbleId = "Wobble_" + System.currentTimeMillis() % 1000;
 
         String boneName = bone.getData().getName().toLowerCase();
         boolean hasVisualAttachment = boneHasVisualAttachment(bone);
 
-        // Analyze bone hierarchy
+        // Rest of constructor remains the same...
         this.isRootBone = bone.getParent() == null;
         this.isLeafBone = bone.getChildren().size == 0;
         this.chainDepth = calculateChainDepth(bone);
 
-        // Configure constraints - more reasonable values
         if (hasVisualAttachment) {
             this.baseRotationConstraint = isRootBone ? 60f : Math.max(25f, 45f - chainDepth * 2f);
             this.parentInfluence = 0.2f;
@@ -113,6 +115,11 @@ public class BoneWobble {
 
         this.isLimb = hasVisualAttachment && isAnatomicalLimbName(boneName);
         this.isLongLimb = this.isLimb;
+    }
+
+    // Backward compatibility constructor
+    public BoneWobble(float initialRotation, Bone bone) {
+        this(initialRotation, bone, false);
     }
 
     // ================================
