@@ -702,16 +702,26 @@ public class MultiBodyRagdoll {
         return false;
     }
 
+    // Also update the renderTextureRegion method for consistency
     private boolean renderTextureRegion(PolygonSpriteBatch sb, TextureRegion region, AttachmentPhysics physics) {
         float width = region.getRegionWidth() * Settings.scale;
         float height = region.getRegionHeight() * Settings.scale;
+
+        // Check for rotation correction if it's an AtlasRegion
+        float finalRotation = physics.rotation;
+        if (region instanceof TextureAtlas.AtlasRegion) {
+            TextureAtlas.AtlasRegion atlasRegion = (TextureAtlas.AtlasRegion) region;
+            if (atlasRegion.rotate) {
+                finalRotation -= 90f; // Counteract the 90-degree rotation from atlas packing
+            }
+        }
 
         sb.draw(region,
                 physics.x - width / 2f,
                 physics.y - height / 2f,
                 width / 2f, height / 2f,
                 width, height,
-                1f, 1f, physics.rotation);
+                1f, 1f, finalRotation);
 
         return true;
     }
@@ -722,8 +732,13 @@ public class MultiBodyRagdoll {
 
         // Handle both AtlasRegion and regular TextureRegion
         TextureRegion textureRegion;
+        boolean needsRotationCorrection = false;
+
         if (region instanceof TextureAtlas.AtlasRegion) {
-            textureRegion = (TextureAtlas.AtlasRegion) region;
+            TextureAtlas.AtlasRegion atlasRegion = (TextureAtlas.AtlasRegion) region;
+            textureRegion = atlasRegion;
+            // Check if this atlas region was rotated during packing
+            needsRotationCorrection = atlasRegion.rotate;
         } else if (region instanceof TextureRegion) {
             textureRegion = (TextureRegion) region;
         } else {
@@ -741,12 +756,18 @@ public class MultiBodyRagdoll {
         float offsetX = regionAttachment.getX() * regionAttachment.getScaleX() * scaleMultiplier * Settings.scale;
         float offsetY = regionAttachment.getY() * regionAttachment.getScaleY() * scaleMultiplier * Settings.scale;
 
+        // Apply automatic rotation correction for rotated atlas regions
+        float finalRotation = physics.rotation + regionAttachment.getRotation();
+        if (needsRotationCorrection) {
+            finalRotation -= 90f; // Counteract the 90-degree rotation from atlas packing
+        }
+
         sb.draw(textureRegion,
                 physics.x - finalWidth / 2f,
                 physics.y - finalHeight / 2f,
                 finalWidth / 2f, finalHeight / 2f,
                 finalWidth, finalHeight,
-                1f, 1f, physics.rotation + regionAttachment.getRotation());
+                1f, 1f, finalRotation);
 
         return true;
     }
@@ -758,10 +779,13 @@ public class MultiBodyRagdoll {
 
         // Handle both AtlasRegion and regular TextureRegion
         TextureRegion textureRegion;
-        boolean isAtlasRegion = false;
+        boolean needsRotationCorrection = false;
+
         if (region instanceof TextureAtlas.AtlasRegion) {
-            textureRegion = (TextureAtlas.AtlasRegion) region;
-            isAtlasRegion = true;
+            TextureAtlas.AtlasRegion atlasRegion = (TextureAtlas.AtlasRegion) region;
+            textureRegion = atlasRegion;
+            // Check if this atlas region was rotated during packing
+            needsRotationCorrection = atlasRegion.rotate;
         } else if (region instanceof TextureRegion) {
             textureRegion = (TextureRegion) region;
         } else {
@@ -772,13 +796,10 @@ public class MultiBodyRagdoll {
                 entityClassName, textureRegion.getRegionWidth(), textureRegion.getRegionHeight(),
                 physics.originalScaleX, physics.originalScaleY);
 
+        // Apply automatic rotation correction for rotated atlas regions
         float finalRotation = physics.rotation;
-
-        // Only apply special rotation logic for AtlasRegions
-        if (isAtlasRegion && ((TextureAtlas.AtlasRegion) textureRegion).rotate &&
-                entityClassName.equals(Sentry.ID) &&
-                (attachmentName.contains("top") || attachmentName.contains("bottom"))) {
-            finalRotation -= 90f;
+        if (needsRotationCorrection) {
+            finalRotation -= 90f; // Counteract the 90-degree rotation from atlas packing
         }
 
         sb.draw(textureRegion,
