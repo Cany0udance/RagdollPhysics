@@ -482,14 +482,23 @@ public class RagdollFactory {
      * Apply initial physics force to the player ragdoll
      */
     private void applyInitialPlayerForce(MultiBodyRagdoll ragdoll) {
-        float baseForceX = MathUtils.random(MIN_FORCE_X, MAX_FORCE_X);
-        float forceY = MathUtils.random(MIN_FORCE_Y, MAX_FORCE_Y);
+        AbstractPlayer player = (AbstractPlayer) ragdoll.getAssociatedEntity();
+        PhysicsModifier.VelocityModifiers modifiers = PhysicsModifier.calculateModifiers(player);
+
+        float baseForceX = MathUtils.random(MIN_FORCE_X, MAX_FORCE_X) * modifiers.horizontalMultiplier;
+        float forceY = MathUtils.random(MIN_FORCE_Y, MAX_FORCE_Y) * modifiers.verticalMultiplier;
 
         float forceX = -baseForceX;
 
         ragdoll.applyGlobalForce(forceX, forceY);
 
-        // Initialize rotation tracking
+        // Apply angular modifier to bone wobbles if they exist
+        if (ragdoll.boneWobbles != null) {
+            for (BoneWobble wobble : ragdoll.boneWobbles.values()) {
+                wobble.angularVelocity *= modifiers.angularMultiplier;
+            }
+        }
+
         ragdoll.lastRotation = ragdoll.mainBody.rotation;
         ragdoll.totalRotationDegrees = 0f;
     }

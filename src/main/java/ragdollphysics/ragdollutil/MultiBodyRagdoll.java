@@ -303,7 +303,7 @@ public class MultiBodyRagdoll {
         for (Bone bone : skeleton.getBones()) {
             // Use current rotation instead of data rotation
             float currentRotation = bone.getRotation();
-            boneWobbles.put(bone, new BoneWobble(currentRotation, bone, true)); // New constructor parameter
+            boneWobbles.put(bone, new BoneWobble(currentRotation, bone, true));
         }
     }
 
@@ -742,8 +742,8 @@ public class MultiBodyRagdoll {
         float offsetY = regionAttachment.getY() * regionAttachment.getScaleY() * scaleMultiplier * Settings.scale;
 
         sb.draw(textureRegion,
-                physics.x - finalWidth / 2f + offsetX,
-                physics.y - finalHeight / 2f + offsetY,
+                physics.x - finalWidth / 2f,
+                physics.y - finalHeight / 2f,
                 finalWidth / 2f, finalHeight / 2f,
                 finalWidth, finalHeight,
                 1f, 1f, physics.rotation + regionAttachment.getRotation());

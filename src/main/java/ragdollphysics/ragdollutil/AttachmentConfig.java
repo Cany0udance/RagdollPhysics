@@ -76,6 +76,7 @@ public class AttachmentConfig {
         MONSTER_ATTACHMENTS.put(BanditLeader.ID, new String[] {"mask"});
         MONSTER_ATTACHMENTS.put(Sentry.ID, new String[] {"top", "bottom", "jewel"});
         MONSTER_ATTACHMENTS.put(Snecko.ID, new String[] {"eye"});
+        MONSTER_ATTACHMENTS.put("TheSnecko", new String[] {"eye"});
         MONSTER_ATTACHMENTS.put(Centurion.ID, new String[] {"shield"});
         MONSTER_ATTACHMENTS.put(Healer.ID, new String[] {"book"});
         MONSTER_ATTACHMENTS.put(SlaverRed.ID, new String[] {"weponred", "net"});
@@ -135,6 +136,10 @@ public class AttachmentConfig {
                 "shoulderLeft", "shoulderRight", "thighleft", "thighright"
         });
 
+        MONSTER_ATTACHMENTS.put(TorchHead.ID, new String[] {
+                "halberd"
+        });
+
         MONSTER_ATTACHMENTS.put("TheSilent", new String[] {
                 "kris"
         });
@@ -143,13 +148,51 @@ public class AttachmentConfig {
         MONSTER_ATTACHMENTS.put("MyCharacter", new String[] {
                 "tube", "legs", "feet", "hand", "hand2", "shoulder", "torso", "shoulder 2"
         });
+
+        // The Automaton (Downfall)
+        MONSTER_ATTACHMENTS.put("AutomatonChar", new String[] {
+                "abdomen", "armLeft", "armRight", "chest", "footleft", "footright",
+                "forearmLeft", "forearmRight", "handRight", "quadLeft", "quadRight",
+                "shoulderLeft", "shoulderRight", "thighleft", "thighright"
+        });
+
+        // The Champ (Downfall)
+        MONSTER_ATTACHMENTS.put("ChampChar", new String[] {
+                "crown", "sword", "shield"
+        });
+
+        // The Guardian (Downfall)
+        MONSTER_ATTACHMENTS.put("GuardianCharacter", new String[] {
+                "b2", "b3", "b4", "b5", "b6", "b7", "b8", "base", "body", "core",
+                "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10",
+                "f11", "f12", "f13", "f14", "f15", "f16",
+                "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10",
+                "m11", "m12", "m13", "m14",
+                "bgBody", "fgBody", "left_foot", "left_leg", "right_foot", "right_leg",
+                "leftarmbg1", "leftarmbg2", "leftarmbg3", "leftarmbg4", "leftarmbg5",
+                "leftarmfg1", "leftarmfg2", "leftarmfg3", "leftarmfg4", "leftarmfg5",
+                "leftarmfg6", "leftarmfg7", "leftarmfg8", "leftarmfg9", "leftarmfg10", "leftarmfg11",
+                "rightarmbg1", "rightarmbg2", "rightarmbg3", "rightarmbg4", "rightarmbg5", "rightarmbg6", "rightarmbg7",
+                "rightarmfg1", "rightarmfg2", "rightarmfg3", "rightarmfg4", "rightarmfg5",
+                "rightarmfg6", "rightarmfg7", "rightarmfg8", "rightarmfg9", "rightarmfg10"
+        });
+
+        // The Hermit (Downfall)
+        MONSTER_ATTACHMENTS.put("hermit", new String[] {
+                "gun"
+        });
+
+        // The Slime Boss (Downfall)
+        MONSTER_ATTACHMENTS.put("SlimeboundCharacter", new String[] {
+                "hat"
+        });
     }
 
     /**
      * Configure parts that have a chance to detach based on overkill damage
      */
     private static void initializeDismemberableParts() {
-        DISMEMBERABLE_PARTS.put(Cultist.ID, new String[] {"head"});
+    //    DISMEMBERABLE_PARTS.put(Cultist.ID, new String[] {"head"});
         DISMEMBERABLE_PARTS.put(GremlinThief.ID, new String[] {"head"});
         DISMEMBERABLE_PARTS.put(GremlinWarrior.ID, new String[] {"legleft", "legright"});
         DISMEMBERABLE_PARTS.put(GremlinWizard.ID, new String[] {"head"});
@@ -171,10 +214,13 @@ public class AttachmentConfig {
         MONSTER_CHILD_ATTACHMENTS.put(GremlinWizard.ID + ":head", new String[] {"eyes", "eyelids", "horns"});
         MONSTER_CHILD_ATTACHMENTS.put(BanditBear.ID + ":mask", new String[] {"right_eye", "left_eye"});
         MONSTER_CHILD_ATTACHMENTS.put(Snecko.ID + ":eye", new String[] {"pupil", "iris"});
+        MONSTER_CHILD_ATTACHMENTS.put("TheSnecko" + ":eye", new String[] {"pupil", "iris"});
         MONSTER_CHILD_ATTACHMENTS.put(ShelledParasite.ID + ":lowerBody", new String[] {"mouth"});
         MONSTER_CHILD_ATTACHMENTS.put(Centurion.ID + ":shield", new String[] {"shieldhandles"});
         MONSTER_CHILD_ATTACHMENTS.put(Champ.ID + ":sword", new String[] {"swordHilt"});
         MONSTER_CHILD_ATTACHMENTS.put(Champ.ID + ":shield", new String[] {"handle"});
+        MONSTER_CHILD_ATTACHMENTS.put("ChampChar" + ":sword", new String[] {"swordHilt"});
+        MONSTER_CHILD_ATTACHMENTS.put("ChampChar" + ":shield", new String[] {"handle"});
     }
 
     // ================================

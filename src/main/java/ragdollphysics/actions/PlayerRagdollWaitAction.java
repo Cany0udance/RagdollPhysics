@@ -35,8 +35,6 @@ public class PlayerRagdollWaitAction extends AbstractGameAction {
             settleCheckTimer = 0f;
 
             if (ragdollManager.isPlayerRagdollSettled(player)) {
-                BaseMod.logger.info("[PlayerRagdollWaitAction] Player ragdoll settled after " +
-                        String.format("%.2f", totalTime) + "s, ending action");
                 finishAction(); // Call finishAction instead of just setting isDone
                 return;
             }
@@ -44,7 +42,6 @@ public class PlayerRagdollWaitAction extends AbstractGameAction {
 
         // Failsafe timeout
         if (totalTime >= RAGDOLL_TIMEOUT) {
-            BaseMod.logger.info("[PlayerRagdollWaitAction] Ragdoll timeout reached, ending action");
             finishAction(); // Call finishAction instead of just setting isDone
             return;
         }
@@ -54,11 +51,8 @@ public class PlayerRagdollWaitAction extends AbstractGameAction {
      * Finishes the action and handles cleanup/restoration
      */
     private void finishAction() {
-        BaseMod.logger.info("[PlayerRagdollWaitAction] Finishing action (player.isDead=" + player.isDead + ")");
-
         // If player was revived during ragdoll (Lizard Tail, Fairy Potion, etc.)
         if (!player.isDead) {
-            BaseMod.logger.info("[PlayerRagdollWaitAction] Player was revived, cleaning up ragdoll and restoring state");
             // Remove the player ragdoll
             ragdollManager.cleanupPlayerRagdoll(player);
             // Restore player visual state if needed
@@ -72,7 +66,6 @@ public class PlayerRagdollWaitAction extends AbstractGameAction {
      * Restores the player's visual state after ragdoll cleanup
      */
     private void restorePlayerState() {
-        BaseMod.logger.info("[PlayerRagdollWaitAction] Restoring player visual state");
 
         try {
             Field skeletonField = AbstractCreature.class.getDeclaredField("skeleton");

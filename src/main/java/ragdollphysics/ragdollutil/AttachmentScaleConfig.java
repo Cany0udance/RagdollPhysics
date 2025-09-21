@@ -13,6 +13,7 @@ public class AttachmentScaleConfig {
     static {
         // Guardian appears to be designed to render at half scale
         MONSTER_SCALE_OVERRIDES.put(TheGuardian.ID, 0.5f);
+        MONSTER_SCALE_OVERRIDES.put("GuardianCharacter", 0.5f);
     }
 
     /**

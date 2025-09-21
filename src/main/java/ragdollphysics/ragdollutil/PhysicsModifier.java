@@ -38,6 +38,12 @@ public class PhysicsModifier {
     private static final float VERTICAL_BASELINE_SCALE = 1.0f;      // 20 overkill
     private static final float VERTICAL_MAX_SCALE = 1.3f;           // 21-50 overkill
 
+    // Player-specific scaling (more generous at low overkill)
+    private static final float PLAYER_MIN_HORIZONTAL_SCALE = 0.5f;     // vs 0.2f for enemies
+    private static final float PLAYER_VERTICAL_TINY_HOP_SCALE = 0.6f;  // vs 0.3f for enemies
+    private static final float PLAYER_VERTICAL_SMALL_HOP_SCALE = 0.8f; // vs 0.4f for enemies
+    private static final float PLAYER_MIN_ANGULAR_SCALE = 0.6f;        // vs 0.3f for enemies
+
     // Vertical scaling breakpoints
     private static final float VERTICAL_TINY_THRESHOLD = 5f;
     private static final float VERTICAL_SMALL_THRESHOLD = 19f;
@@ -172,9 +178,9 @@ public class PhysicsModifier {
         EntityWeight weight = getWeight(entity);
 
         // Calculate base scaling factors from overkill damage
-        float horizontalOverkillScale = calculateHorizontalScaling(overkillDamage);
-        float verticalOverkillScale = calculateVerticalScaling(overkillDamage);
-        float angularOverkillScale = calculateAngularScaling(overkillDamage);
+        float horizontalOverkillScale = calculateHorizontalScaling(overkillDamage, entity);
+        float verticalOverkillScale = calculateVerticalScaling(overkillDamage, entity);
+        float angularOverkillScale = calculateAngularScaling(overkillDamage, entity);
 
         // Apply weight modifiers to each velocity type
         float horizontalMult = horizontalOverkillScale * calculateWeightMultiplier(weight.modifier, WEIGHT_HORIZONTAL_IMPACT);
@@ -191,31 +197,34 @@ public class PhysicsModifier {
     /**
      * Calculate horizontal velocity scaling (linear interpolation)
      */
-    private static float calculateHorizontalScaling(float overkillDamage) {
+    private static float calculateHorizontalScaling(float overkillDamage, AbstractCreature entity) {
+        boolean isPlayer = entity instanceof AbstractPlayer;
+        float minScale = isPlayer ? PLAYER_MIN_HORIZONTAL_SCALE : MIN_HORIZONTAL_SCALE;
+
         float overkillRatio = Math.max(0f, Math.min(1f, overkillDamage / OVERKILL_MAX));
-        return MIN_HORIZONTAL_SCALE + (MAX_HORIZONTAL_SCALE - MIN_HORIZONTAL_SCALE) * overkillRatio;
+        return minScale + (MAX_HORIZONTAL_SCALE - minScale) * overkillRatio;
     }
 
     /**
      * Calculate vertical velocity scaling (tiered system)
      */
-    private static float calculateVerticalScaling(float overkillDamage) {
+    private static float calculateVerticalScaling(float overkillDamage, AbstractCreature entity) {
+        boolean isPlayer = entity instanceof AbstractPlayer;
+
+        float tinyHopScale = isPlayer ? PLAYER_VERTICAL_TINY_HOP_SCALE : VERTICAL_TINY_HOP_SCALE;
+        float smallHopScale = isPlayer ? PLAYER_VERTICAL_SMALL_HOP_SCALE : VERTICAL_SMALL_HOP_SCALE;
+
         if (overkillDamage <= VERTICAL_TINY_THRESHOLD) {
-            // 0-5 overkill: tiny hop
-            return VERTICAL_TINY_HOP_SCALE;
+            return tinyHopScale;
         } else if (overkillDamage <= VERTICAL_SMALL_THRESHOLD) {
-            // 6-19 overkill: interpolate from tiny to small
             float progress = (overkillDamage - VERTICAL_TINY_THRESHOLD) / (VERTICAL_SMALL_THRESHOLD - VERTICAL_TINY_THRESHOLD);
-            return VERTICAL_TINY_HOP_SCALE + (VERTICAL_SMALL_HOP_SCALE - VERTICAL_TINY_HOP_SCALE) * progress;
+            return tinyHopScale + (smallHopScale - tinyHopScale) * progress;
         } else if (overkillDamage == OVERKILL_BASELINE) {
-            // Exactly 20 overkill: baseline
             return VERTICAL_BASELINE_SCALE;
         } else if (overkillDamage < OVERKILL_BASELINE) {
-            // 19.1-19.9 overkill: interpolate from small to baseline
             float progress = (overkillDamage - VERTICAL_SMALL_THRESHOLD) / (OVERKILL_BASELINE - VERTICAL_SMALL_THRESHOLD);
-            return VERTICAL_SMALL_HOP_SCALE + (VERTICAL_BASELINE_SCALE - VERTICAL_SMALL_HOP_SCALE) * progress;
+            return smallHopScale + (VERTICAL_BASELINE_SCALE - smallHopScale) * progress;
         } else {
-            // 21-50 overkill: interpolate from baseline to max
             float progress = Math.min(1f, (overkillDamage - OVERKILL_BASELINE) / (OVERKILL_MAX - OVERKILL_BASELINE));
             return VERTICAL_BASELINE_SCALE + (VERTICAL_MAX_SCALE - VERTICAL_BASELINE_SCALE) * progress;
         }
@@ -224,9 +233,12 @@ public class PhysicsModifier {
     /**
      * Calculate angular velocity scaling (linear interpolation)
      */
-    private static float calculateAngularScaling(float overkillDamage) {
+    private static float calculateAngularScaling(float overkillDamage, AbstractCreature entity) {
+        boolean isPlayer = entity instanceof AbstractPlayer;
+        float minScale = isPlayer ? PLAYER_MIN_ANGULAR_SCALE : MIN_ANGULAR_SCALE;
+
         float overkillRatio = Math.max(0f, Math.min(1f, overkillDamage / OVERKILL_MAX));
-        return MIN_ANGULAR_SCALE + (MAX_ANGULAR_SCALE - MIN_ANGULAR_SCALE) * overkillRatio;
+        return minScale + (MAX_ANGULAR_SCALE - minScale) * overkillRatio;
     }
 
     // ================================

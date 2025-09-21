@@ -65,8 +65,8 @@ public class RagdollPatches {
                 float overkillDamage = OverkillTracker.calculateAndRecordOverkill(__instance);
 
                 if (overkillDamage >= 0) { // Only log if we have valid data
-                    BaseMod.logger.info("Monster " + __instance.getClass().getSimpleName()
-                            + " killed with " + String.format("%.1f", overkillDamage) + " overkill damage");
+                //    BaseMod.logger.info("Monster " + __instance.getClass().getSimpleName()
+                 //           + " killed with " + String.format("%.1f", overkillDamage) + " overkill damage");
                 }
             }
         }
@@ -77,21 +77,24 @@ public class RagdollPatches {
 
         @SpirePrefixPatch
         public static void prefix(AbstractPlayer __instance, DamageInfo info) {
-            // Store the health before damage is applied
+
             if (!__instance.isDead && info.output > 0) {
-                // Store pre-damage state for overkill calculation
                 OverkillTracker.storePreDamageState(__instance, __instance.currentHealth, info.output);
             }
         }
 
         @SpirePostfixPatch
         public static void postfix(AbstractPlayer __instance, DamageInfo info) {
-            // Only calculate overkill if the player just died from this damage
-            if (__instance.currentHealth <= 0) {
+
+            // Check if this damage should have killed the player
+            float preHealth = OverkillTracker.getPreDamageHealth(__instance);
+            boolean shouldHaveDied = (preHealth > 0 && preHealth - info.output <= 0);
+
+            if (shouldHaveDied || __instance.isDead) {
                 float overkillDamage = OverkillTracker.calculateAndRecordOverkill(__instance);
 
-                if (overkillDamage >= 0) { // Only log if we have valid data
-                    BaseMod.logger.info("Player killed with " + String.format("%.1f", overkillDamage) + " overkill damage");
+                if (overkillDamage >= 0) {
+                //    BaseMod.logger.info("Player killed with " + String.format("%.1f", overkillDamage) + " overkill damage");
                 }
             }
         }
@@ -154,12 +157,12 @@ public class RagdollPatches {
                 AbstractPlayer player = (AbstractPlayer) __instance;
 
                 if (player.currentHealth <= 0) {
-                    BaseMod.logger.info("[HealthBarUpdatePatch] Player health hit 0, creating VFX and action");
+                 //   BaseMod.logger.info("[HealthBarUpdatePatch] Player health hit 0, creating VFX and action");
 
                     AbstractDungeon.effectsQueue.add(new PlayerRagdollVFX(player, ragdollManager));
                     AbstractDungeon.actionManager.addToTop(new PlayerRagdollWaitAction(player, ragdollManager));
 
-                    BaseMod.logger.info("[HealthBarUpdatePatch] VFX and action queued");
+                 //   BaseMod.logger.info("[HealthBarUpdatePatch] VFX and action queued");
                 }
             }
         }

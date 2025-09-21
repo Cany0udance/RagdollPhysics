@@ -25,13 +25,11 @@ public class PlayerRagdollVFX extends AbstractGameEffect {
         this.player = player;
         this.ragdollManager = ragdollManager;
         this.duration = RAGDOLL_TIMEOUT;
-        BaseMod.logger.info("[PlayerRagdollVFX] VFX created");
     }
 
     @Override
     public void update() {
         if (!ragdollCreated) {
-            BaseMod.logger.info("[PlayerRagdollVFX] Creating player ragdoll immediately");
             ragdollManager.createPlayerRagdollImmediately(player);
             ragdollCreated = true;
         }
@@ -44,8 +42,6 @@ public class PlayerRagdollVFX extends AbstractGameEffect {
             settleCheckTimer = 0f;
 
             if (ragdollManager.isPlayerRagdollSettled(player)) {
-                BaseMod.logger.info("[PlayerRagdollVFX] Ragdoll settled after " +
-                        String.format("%.2f", totalTime) + "s, ending VFX");
                 this.isDone = true;
                 return;
             }
@@ -53,7 +49,6 @@ public class PlayerRagdollVFX extends AbstractGameEffect {
 
         // Failsafe timeout
         if (totalTime >= RAGDOLL_TIMEOUT) {
-            BaseMod.logger.info("[PlayerRagdollVFX] Timeout reached, ending VFX");
             this.isDone = true;
         }
     }

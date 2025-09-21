@@ -48,6 +48,11 @@ public class OverkillTracker {
         return overkill != null ? overkill : 20f; // Default to baseline
     }
 
+    public static float getPreDamageHealth(AbstractCreature entity) {
+        PreDamageState preState = preDamageStates.get(entity);
+        return preState != null ? preState.health : 0f;
+    }
+
     public static void cleanup(AbstractCreature entity) {
         preDamageStates.remove(entity);
         overkillValues.remove(entity);

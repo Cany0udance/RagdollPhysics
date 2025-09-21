@@ -50,6 +50,7 @@ public class CenterOfMassConfig {
         customBodyAttachments.put(WrithingMass.ID, new String[]{"leftMass"});
         customBodyAttachments.put(SpireGrowth.ID, new String[]{"tentacle_center"});
         customBodyAttachments.put(Champ.ID, new String[]{"lowerChest"});
+        customBodyAttachments.put("ChampChar", new String[]{"lowerChest"});
         customBodyAttachments.put(BronzeAutomaton.ID, new String[]{"chest"});
         customBodyAttachments.put(GiantHead.ID, new String[]{"head"});
         customBodyAttachments.put(TimeEater.ID, new String[]{"cloak_fg"});
