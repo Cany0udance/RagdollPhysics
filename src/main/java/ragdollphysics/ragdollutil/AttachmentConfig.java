@@ -281,14 +281,14 @@ public class AttachmentConfig {
 
         // Check for Haberdashery attachments first
         if (attachmentLower.startsWith("haberdashery")) {
-            BaseMod.logger.info("Found Haberdashery attachment: " + attachmentName + " -> DETACHING");
+          // BaseMod.logger.info("Found Haberdashery attachment: " + attachmentName + " -> DETACHING");
             return true;
         }
 
         // Check global attachments
         for (String globalAttachment : GLOBAL_ATTACHMENTS) {
             if (attachmentLower.contains(globalAttachment.toLowerCase())) {
-                BaseMod.logger.info("Found global attachment: " + attachmentName + " -> DETACHING");
+          //      BaseMod.logger.info("Found global attachment: " + attachmentName + " -> DETACHING");
                 return true;
             }
         }
@@ -298,7 +298,7 @@ public class AttachmentConfig {
         for (String attachment : attachments) {
             String attachmentTarget = attachment.toLowerCase();
             if (attachmentLower.equals(attachmentTarget) || attachmentLower.contains(attachmentTarget)) {
-                BaseMod.logger.info("Found monster-specific attachment: " + attachmentName + " -> DETACHING");
+           //     BaseMod.logger.info("Found monster-specific attachment: " + attachmentName + " -> DETACHING");
                 return true;
             }
         }
@@ -306,7 +306,7 @@ public class AttachmentConfig {
         // Check dismemberment
         boolean shouldDismember = shouldDismember(entityClassName, attachmentName, overkillDamage);
         if (shouldDismember) {
-            BaseMod.logger.info("Dismemberment triggered for: " + attachmentName + " -> DETACHING");
+         //   BaseMod.logger.info("Dismemberment triggered for: " + attachmentName + " -> DETACHING");
         }
 
         return shouldDismember;

@@ -74,26 +74,25 @@ public class RagdollPhysics implements
     public void receivePostInitialize() {
         ModPanel settingsPanel = new ModPanel();
 
+        String[] TEXT = CardCrawlGame.languagePack.getUIString(makeID("ConfigMenu")).TEXT;
+
         String toggleText1 = "Enable zero gravity mode";
         String toggleText2 = "Enable debug squares (requires restart)";
         String toggleText3 = "Enable ragdolls for image-based enemies";
 
-
-        // Always display names toggle
-        settingsPanel.addUIElement(new ModLabeledToggleButton(toggleText1, 350, 700, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableZeroGravity"), settingsPanel, label -> {}, button -> {
+        settingsPanel.addUIElement(new ModLabeledToggleButton(TEXT[0], 350, 700, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableZeroGravity"), settingsPanel, label -> {}, button -> {
             enableZeroGravity = button.enabled;
             config.setBool("enableZeroGravity", button.enabled);
             try {config.save();} catch (Exception e) {}
         }));
 
-        // Should name bosses toggle
-        settingsPanel.addUIElement(new ModLabeledToggleButton(toggleText2, 350, 650, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableDebugSquares"), settingsPanel, label -> {}, button -> {
-            enableDebugSquares = button.enabled;
-            config.setBool("enableDebugSquares", button.enabled);
-            try {config.save();} catch (Exception e) {}
-        }));
+      //  settingsPanel.addUIElement(new ModLabeledToggleButton(toggleText2, 350, 650, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableDebugSquares"), settingsPanel, label -> {}, button -> {
+     //       enableDebugSquares = button.enabled;
+      //      config.setBool("enableDebugSquares", button.enabled);
+     //       try {config.save();} catch (Exception e) {}
+     //   }));
 
-        settingsPanel.addUIElement(new ModLabeledToggleButton(toggleText3, 350, 600, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableImageRagdolls"), settingsPanel, label -> {}, button -> {
+        settingsPanel.addUIElement(new ModLabeledToggleButton(TEXT[1], 350, 650, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableImageRagdolls"), settingsPanel, label -> {}, button -> {
             enableImageRagdolls = button.enabled;
             config.setBool("enableImageRagdolls", button.enabled);
             try {config.save();} catch (Exception e) {}

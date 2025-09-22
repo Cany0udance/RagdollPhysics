@@ -52,10 +52,10 @@ public class ReflectionHelper {
             renderNameMethod.setAccessible(true);
 
             fieldsInitialized = true;
-            BaseMod.logger.info("ReflectionHelper fields initialized successfully");
+          //  BaseMod.logger.info("ReflectionHelper fields initialized successfully");
         } catch (Exception e) {
             fieldsInitialized = false;
-            BaseMod.logger.error("Failed to initialize ReflectionHelper fields: " + e.getMessage());
+         //   BaseMod.logger.error("Failed to initialize ReflectionHelper fields: " + e.getMessage());
             e.printStackTrace();
         }
     }

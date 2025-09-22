@@ -4,6 +4,8 @@ import basemod.BaseMod;
 import com.badlogic.gdx.math.MathUtils;
 import com.esotericsoftware.spine.Bone;
 import com.esotericsoftware.spine.attachments.Attachment;
+import com.esotericsoftware.spine.attachments.MeshAttachment;
+import com.esotericsoftware.spine.attachments.RegionAttachment;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -88,8 +90,7 @@ public class AttachmentPhysics {
     }
 
     /**
-     * Create an attachment with optional parent relationship
-     * @param parent If null, creates independent attachment. If provided, creates child attachment.
+     * Enhanced AttachmentPhysics constructor with smart rotation handling
      */
     public AttachmentPhysics(float startX, float startY, float groundLevel, Bone bone,
                              Attachment attachment, String attachmentName, AttachmentPhysics parent) {
@@ -97,13 +98,63 @@ public class AttachmentPhysics {
         this.x = startX;
         this.y = startY;
         this.groundY = groundLevel;
-        this.rotation = bone.getWorldRotationX();
         this.attachment = attachment;
         this.attachmentName = attachmentName;
         this.attachmentId = generateAttachmentId(attachmentName);
         this.originalBone = bone;
         this.originalScaleX = bone.getScaleX();
         this.originalScaleY = bone.getScaleY();
+
+        // DEBUG: Log rotation information before assignment
+        float boneWorldRotation = bone.getWorldRotationX();
+        float boneLocalRotation = bone.getRotation();
+        float boneDataRotation = bone.getData().getRotation();
+
+        /*
+
+        BaseMod.logger.info("=== ATTACHMENT ROTATION DEBUG ===");
+        BaseMod.logger.info("Attachment: " + attachmentName);
+        BaseMod.logger.info("Attachment Type: " + attachment.getClass().getSimpleName());
+        BaseMod.logger.info("Bone: " + bone.getData().getName());
+        BaseMod.logger.info("Bone World Rotation: " + boneWorldRotation);
+        BaseMod.logger.info("Bone Local Rotation: " + boneLocalRotation);
+        BaseMod.logger.info("Bone Data Rotation: " + boneDataRotation);
+
+         */
+
+        // Calculate attachment rotation offset
+        float attachmentRotationOffset = 0f;
+        if (attachment instanceof RegionAttachment) {
+            RegionAttachment regionAttachment = (RegionAttachment) attachment;
+            attachmentRotationOffset = regionAttachment.getRotation();
+          //  BaseMod.logger.info("RegionAttachment Rotation: " + attachmentRotationOffset);
+        //    BaseMod.logger.info("RegionAttachment ScaleX: " + regionAttachment.getScaleX());
+        //    BaseMod.logger.info("RegionAttachment ScaleY: " + regionAttachment.getScaleY());
+        }
+
+        // Smart rotation strategy based on attachment type and values
+        float finalRotation;
+
+        if (attachment instanceof RegionAttachment && Math.abs(attachmentRotationOffset) > 10f) {
+            // RegionAttachments with significant rotation offset: use ONLY bone rotation (weapons preserve animated pose)
+            finalRotation = boneWorldRotation;
+        //    BaseMod.logger.info("Strategy: RegionAttachment using bone rotation only (weapons/tools)");
+        } else if (attachment instanceof MeshAttachment) {
+            // MeshAttachments: typically ignore bone rotation (like Parasite legs)
+            finalRotation = attachmentRotationOffset; // Will be 0 for MeshAttachments
+        //    BaseMod.logger.info("Strategy: MeshAttachment without bone rotation (body parts)");
+        } else {
+            // RegionAttachments with minimal rotation: also ignore bone rotation
+            finalRotation = attachmentRotationOffset;
+         //   BaseMod.logger.info("Strategy: RegionAttachment without bone rotation (simple parts)");
+        }
+
+        this.rotation = finalRotation;
+
+       // BaseMod.logger.info("Bone World Rotation: " + boneWorldRotation);
+      //  BaseMod.logger.info("Attachment Offset: " + attachmentRotationOffset);
+      //  BaseMod.logger.info("Final Rotation: " + finalRotation);
+     //   BaseMod.logger.info("=== END ROTATION DEBUG ===");
 
         // Setup parent-child relationship
         this.parentAttachment = parent;
