@@ -36,6 +36,8 @@ public class RagdollManager {
     private final HashMap<AbstractPlayer, MultiBodyRagdoll> playerRagdollBodies = new HashMap<>();
     private final Set<AbstractMonster> failedRagdolls = new HashSet<>();
     private final Set<AbstractPlayer> failedPlayerRagdolls = new HashSet<>();
+    private final HashMap<AbstractMonster, Float> ragdollCreationTimes = new HashMap<>();
+    private static final float RAGDOLL_TIMEOUT = 6.0f;
 
     // Exploder-specific state
     private final HashMap<AbstractMonster, Float> exploderTimers = new HashMap<>();
@@ -210,6 +212,8 @@ public class RagdollManager {
             }
 
             ragdollBodies.put(monster, ragdoll);
+            // Track creation time for timeout
+            ragdollCreationTimes.put(monster, 0f);
             return true;
         } catch (Exception e) {
             failedRagdolls.add(monster);
@@ -225,9 +229,18 @@ public class RagdollManager {
 
         try {
             if (ragdoll != null) {
+                // Update ragdoll age
+                updateRagdollAge(monster);
+
                 updateRagdollPhysics(monster, ragdoll);
                 handleExploderLogic(monster, ragdoll);
-                updateDeathTimer(monster, ragdoll);
+
+                // Check for timeout before normal settling logic
+                if (hasRagdollTimedOut(monster)) {
+                    forceRagdollFadeout(monster);
+                } else {
+                    updateDeathTimer(monster, ragdoll);
+                }
             } else {
                 monster.deathTimer -= Gdx.graphics.getDeltaTime();
             }
@@ -246,6 +259,28 @@ public class RagdollManager {
             return fallbackToDefaultDeath(monster);
         }
     }
+
+    private void updateRagdollAge(AbstractMonster monster) {
+        Float currentAge = ragdollCreationTimes.get(monster);
+        if (currentAge != null) {
+            ragdollCreationTimes.put(monster, currentAge + Gdx.graphics.getDeltaTime());
+        }
+    }
+
+    private boolean hasRagdollTimedOut(AbstractMonster monster) {
+        Float ragdollAge = ragdollCreationTimes.get(monster);
+        return ragdollAge != null && ragdollAge >= RAGDOLL_TIMEOUT;
+    }
+
+    private void forceRagdollFadeout(AbstractMonster monster) {
+        // Force the death timer to start ticking regardless of settle state
+        monster.deathTimer -= Gdx.graphics.getDeltaTime();
+
+        // Optional: Add some visual indication that timeout occurred
+        // You could add a special effect or log message here if desired
+    }
+
+
 
     /**
      * Update ragdoll physics and apply to monster
@@ -306,6 +341,7 @@ public class RagdollManager {
         failedRagdolls.remove(monster);
         exploderTimers.remove(monster);
         explodedExploders.remove(monster);
+        ragdollCreationTimes.remove(monster); // Add this line
         OverkillTracker.cleanup(monster);
     }
 
