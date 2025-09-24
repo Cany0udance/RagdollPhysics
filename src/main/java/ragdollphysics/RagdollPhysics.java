@@ -47,6 +47,8 @@ public class RagdollPhysics implements
     public static boolean enableZeroGravity;
     public static boolean enableDebugSquares;
     public static boolean enableImageRagdolls;
+    public static boolean enableQuickDespawn;
+    public static boolean enableAllShatter;
 
     public static String makeID(String id) {
         return modID + ":" + id;
@@ -58,10 +60,14 @@ public class RagdollPhysics implements
         defaults.setProperty("enableZeroGravity", "false");
         defaults.setProperty("enableDebugSquares", "false");
         defaults.setProperty("enableImageRagdolls", "true");
+        defaults.setProperty("enableQuickDespawn", "false");
+        defaults.setProperty("enableAllShatter", "false");
         config = new SpireConfig(modID, "config", defaults);
         enableZeroGravity = config.getBool("enableZeroGravity");
         enableDebugSquares = config.getBool("enableDebugSquares");
         enableImageRagdolls = config.getBool("enableImageRagdolls");
+        enableQuickDespawn = config.getBool("enableQuickDespawn");
+        enableAllShatter = config.getBool("enableAllShatter");
         new RagdollPhysics();
     }
 
@@ -95,6 +101,18 @@ public class RagdollPhysics implements
         settingsPanel.addUIElement(new ModLabeledToggleButton(TEXT[1], 350, 650, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableImageRagdolls"), settingsPanel, label -> {}, button -> {
             enableImageRagdolls = button.enabled;
             config.setBool("enableImageRagdolls", button.enabled);
+            try {config.save();} catch (Exception e) {}
+        }));
+
+        settingsPanel.addUIElement(new ModLabeledToggleButton(TEXT[2], 350, 600, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableQuickDespawn"), settingsPanel, label -> {}, button -> {
+            enableQuickDespawn = button.enabled;
+            config.setBool("enableQuickDespawn", button.enabled);
+            try {config.save();} catch (Exception e) {}
+        }));
+
+        settingsPanel.addUIElement(new ModLabeledToggleButton(TEXT[3], 350, 550, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableAllShatter"), settingsPanel, label -> {}, button -> {
+            enableAllShatter = button.enabled;
+            config.setBool("enableAllShatter", button.enabled);
             try {config.save();} catch (Exception e) {}
         }));
 

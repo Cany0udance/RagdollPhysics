@@ -28,6 +28,7 @@ public class RagdollManager {
     private static final float TINT_FADEOUT_TIME = 1.2f;
     private static final float FALLBACK_TINT_FADEOUT_TIME = 1.8f;
     private static final float EXPLOSION_DESPAWN_DELAY = 0.3f;
+    private static final float QUICK_DEATH_TIMER = 0.5f;
 
     // ================================
     // CORE STORAGE
@@ -298,6 +299,10 @@ public class RagdollManager {
     private void updateDeathTimer(AbstractMonster monster, MultiBodyRagdoll ragdoll) {
         // Only advance death timer if ragdoll has settled
         if (ragdoll.hasSettledOnGround()) {
+            // If quick despawn is enabled and timer is still at default value, reduce it
+            if (ragdollphysics.RagdollPhysics.enableQuickDespawn && monster.deathTimer > QUICK_DEATH_TIMER) {
+                monster.deathTimer = QUICK_DEATH_TIMER;
+            }
             monster.deathTimer -= Gdx.graphics.getDeltaTime();
         }
     }

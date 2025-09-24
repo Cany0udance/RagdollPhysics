@@ -274,21 +274,25 @@ public class AttachmentConfig {
     }
 
     /**
-     * Enhanced shouldDetachAttachment that includes Haberdashery logic
+     * Enhanced shouldDetachAttachment that includes All Shatter mode for complete dissolution
      */
     public static boolean shouldDetachAttachment(String entityClassName, String attachmentName, float overkillDamage) {
+        // Check if All Shatter mode is enabled - everything becomes an attachment
+        if (ragdollphysics.RagdollPhysics.enableAllShatter) {
+            return shouldShatterAttachment(attachmentName);
+        }
+
+        // Original logic for normal mode
         String attachmentLower = attachmentName.toLowerCase();
 
         // Check for Haberdashery attachments first
         if (attachmentLower.startsWith("haberdashery")) {
-          // BaseMod.logger.info("Found Haberdashery attachment: " + attachmentName + " -> DETACHING");
             return true;
         }
 
         // Check global attachments
         for (String globalAttachment : GLOBAL_ATTACHMENTS) {
             if (attachmentLower.contains(globalAttachment.toLowerCase())) {
-          //      BaseMod.logger.info("Found global attachment: " + attachmentName + " -> DETACHING");
                 return true;
             }
         }
@@ -298,18 +302,28 @@ public class AttachmentConfig {
         for (String attachment : attachments) {
             String attachmentTarget = attachment.toLowerCase();
             if (attachmentLower.equals(attachmentTarget) || attachmentLower.contains(attachmentTarget)) {
-           //     BaseMod.logger.info("Found monster-specific attachment: " + attachmentName + " -> DETACHING");
                 return true;
             }
         }
 
         // Check dismemberment
-        boolean shouldDismember = shouldDismember(entityClassName, attachmentName, overkillDamage);
-        if (shouldDismember) {
-         //   BaseMod.logger.info("Dismemberment triggered for: " + attachmentName + " -> DETACHING");
+        return shouldDismember(entityClassName, attachmentName, overkillDamage);
+    }
+
+    /**
+     * Determine if an attachment should shatter in All Shatter mode
+     * Only excludes shadows since they should fade, not become physics objects
+     */
+    private static boolean shouldShatterAttachment(String attachmentName) {
+        String attachmentLower = attachmentName.toLowerCase();
+
+        // Only exclude shadows - they should fade out, not become physics objects
+        if (attachmentLower.contains("shadow")) {
+            return false;
         }
 
-        return shouldDismember;
+        // Everything else becomes a physics attachment for complete dissolution
+        return true;
     }
 
     // ================================
