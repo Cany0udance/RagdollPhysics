@@ -6,6 +6,7 @@ import com.esotericsoftware.spine.Bone;
 import com.esotericsoftware.spine.attachments.Attachment;
 import com.esotericsoftware.spine.attachments.MeshAttachment;
 import com.esotericsoftware.spine.attachments.RegionAttachment;
+import com.megacrit.cardcrawl.core.Settings;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +26,7 @@ public class AttachmentPhysics {
     // ================================
 
     private static final float ATTACHMENT_BOUNCE_THRESHOLD = 150f;
-    private static final float GRAVITY = -1200f;
+    private static final float GRAVITY = -1200f * Settings.scale;
     private static final float GROUND_BOUNCE_DAMPING = 0.4f;
     private static final float GROUND_FRICTION = 0.85f;
     private static final float GROUND_ANGULAR_DAMPING = 0.6f;
@@ -41,9 +42,10 @@ public class AttachmentPhysics {
     // WORLD BOUNDARIES
     // ================================
 
-    private static final float RIGHT_WALL_X = 1850f;
-    private static final float LEFT_WALL_X = 0f;
-    private static final float CEILING_Y = 1100f;
+    private static final float RIGHT_WALL_X = 1850f * Settings.scale;
+    private static final float LEFT_WALL_X = 100f * Settings.scale;
+    private static final float CEILING_Y = 1100f * Settings.scale;
+
 
     // ================================
     // PHYSICS STATE

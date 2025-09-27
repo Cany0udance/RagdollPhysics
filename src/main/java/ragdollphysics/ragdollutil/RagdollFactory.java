@@ -440,17 +440,15 @@ public class RagdollFactory {
      * Apply initial physics force to the ragdoll
      */
     private void applyInitialForce(MultiBodyRagdoll ragdoll) {
-        float baseForceX = MathUtils.random(MIN_FORCE_X, MAX_FORCE_X);
-        float forceY = MathUtils.random(MIN_FORCE_Y, MAX_FORCE_Y);
+        float baseForceX = MathUtils.random(MIN_FORCE_X, MAX_FORCE_X) * Settings.scale;
+        float forceY = MathUtils.random(MIN_FORCE_Y, MAX_FORCE_Y) * Settings.scale;
 
-        // Determine direction based on monster position relative to player
         float playerX = AbstractDungeon.player.drawX;
         float monsterX = ragdoll.getAssociatedEntity().drawX;
         float forceX = (monsterX < playerX) ? -baseForceX : baseForceX;
 
         ragdoll.applyGlobalForce(forceX, forceY);
 
-        // Initialize rotation tracking
         ragdoll.lastRotation = ragdoll.mainBody.rotation;
         ragdoll.totalRotationDegrees = 0f;
     }
@@ -485,9 +483,8 @@ public class RagdollFactory {
         AbstractPlayer player = (AbstractPlayer) ragdoll.getAssociatedEntity();
         PhysicsModifier.VelocityModifiers modifiers = PhysicsModifier.calculateModifiers(player);
 
-        float baseForceX = MathUtils.random(MIN_FORCE_X, MAX_FORCE_X) * modifiers.horizontalMultiplier;
-        float forceY = MathUtils.random(MIN_FORCE_Y, MAX_FORCE_Y) * modifiers.verticalMultiplier;
-
+        float baseForceX = MathUtils.random(MIN_FORCE_X, MAX_FORCE_X) * Settings.scale * modifiers.horizontalMultiplier;
+        float forceY = MathUtils.random(MIN_FORCE_Y, MAX_FORCE_Y) * Settings.scale * modifiers.verticalMultiplier;
         float forceX = -baseForceX;
 
         ragdoll.applyGlobalForce(forceX, forceY);

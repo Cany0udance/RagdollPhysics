@@ -150,8 +150,8 @@ public class RagdollDebugRenderer {
 
         if (bodyBone != null) {
             sb.setColor(Color.CYAN);
-            float bodyX = skeleton.getX() + bodyBone.getWorldX() * Settings.scale;
-            float bodyY = skeleton.getY() + bodyBone.getWorldY() * Settings.scale;
+            float bodyX = skeleton.getX() + bodyBone.getWorldX();
+            float bodyY = skeleton.getY() + bodyBone.getWorldY();
             sb.draw(debugSquareTexture,
                     bodyX - squareSize/2f,
                     bodyY - squareSize/2f,
@@ -169,8 +169,8 @@ public class RagdollDebugRenderer {
                 Bone bone = skeleton.findBone(boneName);
                 if (bone != null) {
                     sb.setColor(Color.CYAN);
-                    float boneX = skeleton.getX() + bone.getWorldX() * Settings.scale;
-                    float boneY = skeleton.getY() + bone.getWorldY() * Settings.scale;
+                    float boneX = skeleton.getX() + bone.getWorldX();
+                    float boneY = skeleton.getY() + bone.getWorldY();
                     sb.draw(debugSquareTexture,
                             boneX - squareSize/2f,
                             boneY - squareSize/2f,

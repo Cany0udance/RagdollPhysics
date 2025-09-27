@@ -2,6 +2,7 @@ package ragdollphysics.ragdollutil;
 
 import basemod.BaseMod;
 import com.badlogic.gdx.math.MathUtils;
+import com.megacrit.cardcrawl.core.Settings;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
 import com.megacrit.cardcrawl.monsters.city.BronzeOrb;
 
@@ -39,10 +40,10 @@ public class RagdollPhysics {
     // ================================
 
     private static final float SIMPLE_BOUNCE_THRESHOLD = 200f;
-    private static final float GRAVITY = -1200f;
-    private static final float RIGHT_WALL_X = 1850f;
-    private static final float LEFT_WALL_X = 100f;
-    private static final float CEILING_Y = 1100f;
+    private static final float GRAVITY = -1200f * Settings.scale;
+    private static final float RIGHT_WALL_X = 1850f * Settings.scale;
+    private static final float LEFT_WALL_X = 100f * Settings.scale;
+    private static final float CEILING_Y = 1100f * Settings.scale;
 
 
     // ================================

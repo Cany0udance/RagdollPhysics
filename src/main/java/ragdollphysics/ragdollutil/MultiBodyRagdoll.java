@@ -271,8 +271,8 @@ public class MultiBodyRagdoll {
             float transformedX = bone.getA() * localX + bone.getB() * localY;
             float transformedY = bone.getC() * localX + bone.getD() * localY;
             return new float[]{
-                    entity.drawX + (bone.getWorldX() + transformedX) * Settings.scale,
-                    entity.drawY + (bone.getWorldY() + transformedY) * Settings.scale
+                    entity.drawX + (bone.getWorldX() + transformedX),
+                    entity.drawY + (bone.getWorldY() + transformedY)
             };
         } else if (slot.getAttachment() instanceof MeshAttachment) {
             MeshAttachment meshAttachment = (MeshAttachment) slot.getAttachment();
