@@ -77,8 +77,8 @@ public class CenterOfMassConfig {
         Bone bodyBone = findBodyBone(skeleton, monsterClassName);
         if (bodyBone != null) {
             // Position physics center at the body bone's world position
-            float bodyWorldX = bodyBone.getWorldX();
-            float bodyWorldY = bodyBone.getWorldY();
+            float bodyWorldX = bodyBone.getWorldX() * Settings.scale;
+            float bodyWorldY = bodyBone.getWorldY() * Settings.scale;
             return new CenterOffset(bodyWorldX, bodyWorldY);
         } else {
             // Use static fallback offsets if no body bone found

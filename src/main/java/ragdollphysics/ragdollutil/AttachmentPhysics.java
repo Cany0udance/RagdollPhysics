@@ -42,8 +42,8 @@ public class AttachmentPhysics {
     // WORLD BOUNDARIES
     // ================================
 
-    private static final float RIGHT_WALL_X = 1850f * Settings.scale;
-    private static final float LEFT_WALL_X = 100f * Settings.scale;
+    private static final float RIGHT_WALL_X = 1910f * Settings.scale;
+    private static final float LEFT_WALL_X = 10f * Settings.scale;
     private static final float CEILING_Y = 1100f * Settings.scale;
 
 
