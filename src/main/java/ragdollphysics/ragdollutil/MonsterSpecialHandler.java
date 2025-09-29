@@ -12,7 +12,7 @@ public class MonsterSpecialHandler {
 
     public MonsterSpecialHandler() {
         this.handlerId = "SpecialHandler_" + System.currentTimeMillis() % 10000;
-        BaseMod.logger.info("[" + handlerId + "] MonsterSpecialHandler initialized");
+      //  BaseMod.logger.info("[" + handlerId + "] MonsterSpecialHandler initialized");
     }
 
     /**
