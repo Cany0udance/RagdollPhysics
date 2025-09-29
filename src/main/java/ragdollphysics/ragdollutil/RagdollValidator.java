@@ -50,6 +50,18 @@ public class RagdollValidator {
             skeletonField.setAccessible(true);
             srField = AbstractCreature.class.getDeclaredField("sr");
             srField.setAccessible(true);
+
+            String[] possiblePlayerImageFields = {"img", "image", "texture", "playerImg", "characterImg"};
+            for (String fieldName : possiblePlayerImageFields) {
+                try {
+                    Field field = AbstractPlayer.class.getDeclaredField(fieldName);
+                    field.setAccessible(true);
+                    playerImgField = field;
+                    break;
+                } catch (NoSuchFieldException e) {
+                    // Continue to next field name
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }

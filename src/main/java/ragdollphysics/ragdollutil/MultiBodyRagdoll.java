@@ -451,8 +451,10 @@ public class MultiBodyRagdoll {
             // Body-centered positioning and rotation
             float targetBodyWorldX = mainBody.x;
             float targetBodyWorldY = mainBody.y;
-            float currentBodyOffsetX = bodyBone.getWorldX() * Settings.scale;
-            float currentBodyOffsetY = bodyBone.getWorldY() * Settings.scale;
+
+            // Don't multiply by Settings.scale - skeleton.setPosition expects skeleton-space coordinates
+            float currentBodyOffsetX = bodyBone.getWorldX();
+            float currentBodyOffsetY = bodyBone.getWorldY();
 
             skeleton.setPosition(
                     targetBodyWorldX - currentBodyOffsetX,
@@ -482,8 +484,7 @@ public class MultiBodyRagdoll {
             fadeableSlot.slot.getColor().a = fadeableSlot.initialAlpha * (1f - fadeProgress);
         }
 
-        // Apply bone wobbles - MODIFIED to preserve original pose
-// Apply bone wobbles and hide detached attachments
+        // Apply bone wobbles and hide detached attachments
         for (Bone bone : skeleton.getBones()) {
             BoneWobble wobble = boneWobbles.get(bone);
             if (wobble != null) {
@@ -519,6 +520,7 @@ public class MultiBodyRagdoll {
             skeleton.getRootBone().setRotation(normalizedRotation);
         }
     }
+
     /** Apply physics positioning to image-based ragdolls - now works with any AbstractCreature */
     public void applyToImage(AbstractCreature entity) {
         entity.drawX = mainBody.x + physicsToVisualOffsetX;

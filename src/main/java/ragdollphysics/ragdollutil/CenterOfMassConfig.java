@@ -33,7 +33,7 @@ public class CenterOfMassConfig {
         customBodyAttachments.put(LouseNormal.ID, new String[]{"seg3"});
         customBodyAttachments.put(LouseDefensive.ID, new String[]{"seg3"});
         customBodyAttachments.put(SlaverBlue.ID, new String[]{"cloakblue"});
-        customBodyAttachments.put(SlaverRed.ID, new String[]{"cloackred"});
+        customBodyAttachments.put(SlaverRed.ID, new String[]{"cloak"});
         customBodyAttachments.put(Byrd.ID, new String[]{"flying/torso", "grounded/torso"});
         customBodyAttachments.put(BanditBear.ID, new String[]{"Torso"});
         customBodyAttachments.put(BanditLeader.ID, new String[]{"tunic"});
@@ -45,7 +45,7 @@ public class CenterOfMassConfig {
         customBodyAttachments.put(SphericGuardian.ID, new String[]{"orb_main"});
         customBodyAttachments.put(ShelledParasite.ID, new String[]{"upperBody"});
         customBodyAttachments.put(Lagavulin.ID, new String[]{"Shell1", "Shell2"});
-        customBodyAttachments.put(Taskmaster.ID, new String[]{"middle"});
+        customBodyAttachments.put(Taskmaster.ID, new String[]{"cloak"});
         customBodyAttachments.put(Nemesis.ID, new String[]{"cloak"});
         customBodyAttachments.put(WrithingMass.ID, new String[]{"leftMass"});
         customBodyAttachments.put(SpireGrowth.ID, new String[]{"tentacle_center"});
@@ -111,7 +111,7 @@ public class CenterOfMassConfig {
         }
 
         // Final fallback to generic body bone names
-        String[] defaultBodyBoneNames = {"body", "torso", "chest", "spine", "hip", "pelvis", "trunk", "shirt"};
+        String[] defaultBodyBoneNames = {"body", "torso", "chest", "spine", "hip", "pelvis", "trunk", "shirt", "cloak"};
         for (String boneName : defaultBodyBoneNames) {
             Bone bone = skeleton.findBone(boneName);
             if (bone != null) {
@@ -121,6 +121,7 @@ public class CenterOfMassConfig {
 
         return null;
     }
+
 
     /**
      * Find bone by searching for which bone has the specified attachment

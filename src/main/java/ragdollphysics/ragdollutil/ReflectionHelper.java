@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.esotericsoftware.spine.Skeleton;
 import com.esotericsoftware.spine.SkeletonRenderer;
+import com.megacrit.cardcrawl.characters.AbstractPlayer;
 import com.megacrit.cardcrawl.core.AbstractCreature;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
 
@@ -19,10 +20,12 @@ import java.lang.reflect.Method;
 public class ReflectionHelper {
     // Reflection fields for accessing creature internals
     private static Field atlasField;
-    private static Field imgField;
+    private static Field imgField;  // For monsters
+    private static Field playerImgField;  // For players
     private static Field skeletonField;
     private static Field srField;
     private static Method renderNameMethod;
+
     // Initialization status
     private static boolean fieldsInitialized = false;
 
@@ -38,9 +41,12 @@ public class ReflectionHelper {
             atlasField = AbstractCreature.class.getDeclaredField("atlas");
             atlasField.setAccessible(true);
 
-            // img field is in AbstractMonster, not AbstractCreature
+            // Monster img field
             imgField = AbstractMonster.class.getDeclaredField("img");
             imgField.setAccessible(true);
+
+            // Player img field detection
+            initializePlayerImageField();
 
             skeletonField = AbstractCreature.class.getDeclaredField("skeleton");
             skeletonField.setAccessible(true);
@@ -52,11 +58,30 @@ public class ReflectionHelper {
             renderNameMethod.setAccessible(true);
 
             fieldsInitialized = true;
-          //  BaseMod.logger.info("ReflectionHelper fields initialized successfully");
         } catch (Exception e) {
             fieldsInitialized = false;
-         //   BaseMod.logger.error("Failed to initialize ReflectionHelper fields: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Initialize player image field detection
+     */
+    private static void initializePlayerImageField() {
+        // Try common field names for player images
+        String[] possiblePlayerImageFields = {"img", "image", "texture", "playerImg", "characterImg"};
+
+        for (String fieldName : possiblePlayerImageFields) {
+            try {
+                Field field = AbstractPlayer.class.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                playerImgField = field;
+                return;
+            } catch (NoSuchFieldException e) {
+                // Continue to next field name
+            } catch (Exception e) {
+                // Continue to next field name
+            }
         }
     }
 
@@ -70,6 +95,7 @@ public class ReflectionHelper {
     // ================================
     // GENERIC CREATURE METHODS
     // ================================
+
     /**
      * Get creature's texture atlas
      */
@@ -81,18 +107,30 @@ public class ReflectionHelper {
     }
 
     /**
-     * Get creature's image texture
-     * Note: This only works for AbstractMonster instances since img field is in AbstractMonster
+     * Get creature's image texture - now supports both monsters and players
      */
     public Texture getImage(AbstractCreature creature) throws IllegalAccessException {
-        if (imgField == null) {
-            throw new IllegalAccessException("imgField not initialized");
+        if (creature instanceof AbstractMonster) {
+            // Handle monsters
+            if (imgField == null) {
+                throw new IllegalAccessException("imgField not initialized");
+            }
+            return (Texture) imgField.get(creature);
+
+        } else if (creature instanceof AbstractPlayer) {
+            // Handle players
+            if (playerImgField == null) {
+                return null;
+            }
+            try {
+                return (Texture) playerImgField.get(creature);
+            } catch (Exception e) {
+                return null;
+            }
+
+        } else {
+            return null;
         }
-        // Only works for monsters since img field is in AbstractMonster
-        if (!(creature instanceof AbstractMonster)) {
-            return null; // or throw exception if you prefer
-        }
-        return (Texture) imgField.get(creature);
     }
 
     /**
@@ -102,8 +140,7 @@ public class ReflectionHelper {
         if (skeletonField == null) {
             throw new IllegalAccessException("skeletonField not initialized");
         }
-        Skeleton result = (Skeleton) skeletonField.get(creature);
-        return result;
+        return (Skeleton) skeletonField.get(creature);
     }
 
     /**
@@ -119,6 +156,7 @@ public class ReflectionHelper {
     // ================================
     // MONSTER-SPECIFIC METHODS
     // ================================
+
     /**
      * Render monster's name using reflection
      */
@@ -127,5 +165,23 @@ public class ReflectionHelper {
             throw new IllegalAccessException("renderNameMethod not initialized");
         }
         renderNameMethod.invoke(monster, sb);
+    }
+
+    // ================================
+    // UTILITY METHODS
+    // ================================
+
+    /**
+     * Check if player image field was successfully found
+     */
+    public boolean hasPlayerImageSupport() {
+        return playerImgField != null;
+    }
+
+    /**
+     * Get the name of the player image field that was found
+     */
+    public String getPlayerImageFieldName() {
+        return playerImgField != null ? playerImgField.getName() : "none";
     }
 }

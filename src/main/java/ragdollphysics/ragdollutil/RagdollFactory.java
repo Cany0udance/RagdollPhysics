@@ -217,10 +217,10 @@ public class RagdollFactory {
             float customGroundLevel = calculatePlayerGroundLevel(player);
 
             return new MultiBodyRagdoll(
-                    player.drawX,
-                    player.drawY,
+                    player.hb.cX,
+                    player.hb.cY,
                     customGroundLevel,
-                    player.getClass().getSimpleName(), // Use class name as ID for players
+                    player.getClass().getSimpleName(),
                     player
             );
 
