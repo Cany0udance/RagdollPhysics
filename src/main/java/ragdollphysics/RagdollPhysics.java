@@ -60,7 +60,7 @@ public class RagdollPhysics implements
         defaults.setProperty("enableZeroGravity", "false");
         defaults.setProperty("enableDebugSquares", "false");
         defaults.setProperty("enableImageRagdolls", "true");
-        defaults.setProperty("enableQuickDespawn", "false");
+        defaults.setProperty("enableQuickDespawn", "true");
         defaults.setProperty("enableAllShatter", "false");
         config = new SpireConfig(modID, "config", defaults);
         enableZeroGravity = config.getBool("enableZeroGravity");
