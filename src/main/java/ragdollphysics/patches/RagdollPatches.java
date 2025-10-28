@@ -37,7 +37,8 @@ public class RagdollPatches {
 
     // Blacklist of mod packages - blocks ALL players from these mods
     private static final Set<String> BLOCKED_MOD_PACKAGES = new HashSet<>(Arrays.asList(
-            "BlueArchive_ProblemSolver"
+            "BlueArchive_ProblemSolver",
+            "Hraesvelgr"
     ));
 
     private static boolean isBlacklisted(AbstractMonster monster) {
