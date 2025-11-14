@@ -14,6 +14,7 @@ import com.megacrit.cardcrawl.dungeons.AbstractDungeon;
 import com.megacrit.cardcrawl.monsters.AbstractMonster;
 import com.megacrit.cardcrawl.screens.DeathScreen;
 
+import ragdollphysics.RagdollPhysics;
 import ragdollphysics.actions.PlayerRagdollWaitAction;
 import ragdollphysics.effects.PlayerRagdollVFX;
 import ragdollphysics.ragdollutil.OverkillTracker;
@@ -26,8 +27,14 @@ import java.util.Set;
 public class RagdollPatches {
     private static final RagdollManager ragdollManager = new RagdollManager();
 
+    // Blacklist of specific monster IDs
     private static final Set<String> RAGDOLL_BLACKLIST = new HashSet<>(Arrays.asList(
-            "ruina:JesterOfNihil"
+            // Add specific monster IDs here if needed
+    ));
+
+    // Blacklist of mod packages for monsters
+    private static final Set<String> BLOCKED_MONSTER_PACKAGES = new HashSet<>(Arrays.asList(
+            "ruina"
     ));
 
     // Blacklist of player class names that should not have ragdoll physics
@@ -42,10 +49,29 @@ public class RagdollPatches {
     ));
 
     private static boolean isBlacklisted(AbstractMonster monster) {
-        return RAGDOLL_BLACKLIST.contains(monster.id);
+        // Check specific ID blacklist
+        if (RAGDOLL_BLACKLIST.contains(monster.id)) {
+            return true;
+        }
+
+        // Check if monster is from a blocked mod package
+        String packageName = monster.getClass().getPackage() != null ?
+                monster.getClass().getPackage().getName() : "";
+        for (String blockedPackage : BLOCKED_MONSTER_PACKAGES) {
+            if (packageName.contains(blockedPackage)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static boolean isPlayerBlacklisted(AbstractPlayer player) {
+        // Check if player ragdolls are disabled globally
+        if (!RagdollPhysics.enablePlayerRagdolls) {
+            return true;
+        }
+
         // Check individual player blacklist first
         if (PLAYER_RAGDOLL_BLACKLIST.contains(player.getClass().getSimpleName())) {
             return true;

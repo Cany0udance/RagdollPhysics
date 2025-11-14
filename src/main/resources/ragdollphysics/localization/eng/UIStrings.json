@@ -4,7 +4,8 @@
       "Enable zero gravity mode",
       "Enable ragdolls for image-based entities",
       "Enable quick despawns for ragdolls",
-      "Enable the shatter behavior for ALL ragdolls"
+      "Enable the shatter behavior for ALL ragdolls",
+      "Enable ragdolls for player characters"
     ]
   }
 }

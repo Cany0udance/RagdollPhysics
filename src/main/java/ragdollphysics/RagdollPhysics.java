@@ -49,6 +49,7 @@ public class RagdollPhysics implements
     public static boolean enableImageRagdolls;
     public static boolean enableQuickDespawn;
     public static boolean enableAllShatter;
+    public static boolean enablePlayerRagdolls;
 
     public static String makeID(String id) {
         return modID + ":" + id;
@@ -62,12 +63,14 @@ public class RagdollPhysics implements
         defaults.setProperty("enableImageRagdolls", "true");
         defaults.setProperty("enableQuickDespawn", "true");
         defaults.setProperty("enableAllShatter", "false");
+        defaults.setProperty("enablePlayerRagdolls", "true");
         config = new SpireConfig(modID, "config", defaults);
         enableZeroGravity = config.getBool("enableZeroGravity");
         enableDebugSquares = config.getBool("enableDebugSquares");
         enableImageRagdolls = config.getBool("enableImageRagdolls");
         enableQuickDespawn = config.getBool("enableQuickDespawn");
         enableAllShatter = config.getBool("enableAllShatter");
+        enablePlayerRagdolls = config.getBool("enablePlayerRagdolls");
         new RagdollPhysics();
     }
 
@@ -113,6 +116,12 @@ public class RagdollPhysics implements
         settingsPanel.addUIElement(new ModLabeledToggleButton(TEXT[3], 350, 550, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enableAllShatter"), settingsPanel, label -> {}, button -> {
             enableAllShatter = button.enabled;
             config.setBool("enableAllShatter", button.enabled);
+            try {config.save();} catch (Exception e) {}
+        }));
+
+        settingsPanel.addUIElement(new ModLabeledToggleButton(TEXT[4], 350, 500, Settings.CREAM_COLOR, FontHelper.charDescFont, config.getBool("enablePlayerRagdolls"), settingsPanel, label -> {}, button -> {
+            enablePlayerRagdolls = button.enabled;
+            config.setBool("enablePlayerRagdolls", button.enabled);
             try {config.save();} catch (Exception e) {}
         }));
 
